@@ -1,0 +1,120 @@
+/*
+  Falls back to standalone teal/dark defaults so this still looks right
+  outside .auth-split, but inherits --auth-* tokens when nested inside it.
+*/
+.select-field {
+  position: relative;
+}
+
+.select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: inherit;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 9px;
+  border: 1px solid var(--auth-border, #24302e);
+  background: #10151480;
+  color: var(--auth-text, #eef4f2);
+  cursor: pointer;
+}
+
+.select-trigger:focus,
+.select-trigger[aria-expanded='true'] {
+  outline: none;
+  border-color: var(--auth-teal, #14b8a6);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+}
+
+.select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.select-placeholder {
+  color: #5b6664;
+}
+
+.select-chevron {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: var(--auth-muted, #8fa19d);
+  transition: transform 0.15s ease;
+}
+
+.select-chevron-open {
+  transform: rotate(180deg);
+}
+
+.select-options {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 10px;
+  border: 1px solid var(--auth-border, #24302e);
+  background: #0d1312;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 184, 166, 0.4) transparent;
+}
+
+.select-options::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.select-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.select-options::-webkit-scrollbar-thumb {
+  background-color: rgba(20, 184, 166, 0.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.select-options::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(20, 184, 166, 0.65);
+  background-clip: padding-box;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: 14.5px;
+  color: var(--auth-text, #eef4f2);
+  cursor: pointer;
+}
+
+.select-option-active {
+  background: rgba(20, 184, 166, 0.14);
+}
+
+.select-check {
+  font-size: 17px;
+  flex-shrink: 0;
+  color: var(--auth-teal, #14b8a6);
+}
