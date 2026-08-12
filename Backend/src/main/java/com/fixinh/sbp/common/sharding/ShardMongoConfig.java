@@ -1,0 +1,4 @@
+package com.fixinh.sbp.common.sharding;
+
+public class ShardMongoConfig {
+}

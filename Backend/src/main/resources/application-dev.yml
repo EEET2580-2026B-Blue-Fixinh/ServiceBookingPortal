@@ -1,0 +1,15 @@
+# Req 5.S1: single-PC dev environment. Both shards point at the same local
+# mongod instance (different database names), and SMP is mocked so SBP runs
+# standalone before SMP is reachable (Req 4.S2).
+fixinh:
+  sbp:
+    smp:
+      mode: mock
+
+server:
+  ssl:
+    enabled: false
+
+logging:
+  level:
+    com.fixinh.sbp: DEBUG

@@ -1,0 +1,14 @@
+# Req 4.M1, 4.M3, 5.M1: multi-VM environment integrating against the real SMP,
+# consuming its live Booking/Technician/Staff APIs instead of local fixtures.
+fixinh:
+  sbp:
+    smp:
+      mode: live
+
+server:
+  ssl:
+    enabled: true
+
+logging:
+  level:
+    com.fixinh.sbp: INFO
