@@ -1,3 +1,28 @@
+@import 'tailwindcss';
+
+/* Booking module palette, namespaced so Tailwind generates bg-bk-*,
+   text-bk-*, border-bk-* utilities without touching the default palette
+   or the (still plain-CSS) auth pages. Only the booking module consumes
+   these for now — see project decision to migrate screen-by-screen. */
+@theme {
+  --color-bk-teal: #0f766e;
+  --color-bk-teal-strong: #0b5c56;
+  --color-bk-teal-soft: rgba(15, 118, 110, 0.1);
+  --color-bk-bg: #f6f7f6;
+  --color-bk-surface: #ffffff;
+  --color-bk-border: #e3e6e4;
+  --color-bk-text: #101828;
+  --color-bk-muted: #667085;
+  --color-bk-blue: #2563eb;
+  --color-bk-blue-soft: rgba(37, 99, 235, 0.1);
+  --color-bk-amber: #b45309;
+  --color-bk-amber-soft: rgba(217, 119, 6, 0.14);
+  --color-bk-green: #15803d;
+  --color-bk-green-soft: rgba(22, 163, 74, 0.14);
+  --color-bk-red: #b91c1c;
+  --color-bk-red-soft: rgba(220, 38, 38, 0.08);
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -119,46 +144,11 @@ html {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+/* The old bare h1/h2/p/code rules that used to live here (Vite template
+   boilerplate) are gone — they were unlayered CSS, so they silently beat
+   any Tailwind utility class on the same element (unlayered always wins
+   over `@layer utilities`, regardless of specificity). Nothing in the app
+   depends on them anymore: AuthLayout's headings carry their own
+   `.auth-title`/`.auth-brand-body h1` classes, and newer screens style
+   headings with Tailwind directly. Keeping this block around only meant
+   it would keep clobbering the next Tailwind-styled heading by surprise. */
