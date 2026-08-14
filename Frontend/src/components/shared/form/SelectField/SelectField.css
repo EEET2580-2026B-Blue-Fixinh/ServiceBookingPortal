@@ -58,21 +58,53 @@
   transform: rotate(180deg);
 }
 
-.select-options {
+/* The floating panel. It holds the search box (which must stay put) above the
+   list (which scrolls), so the positioning lives here rather than on the ul. */
+.select-popover {
   position: absolute;
   z-index: 10;
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  margin: 0;
   padding: 6px;
-  list-style: none;
   border-radius: 10px;
   border: 1px solid var(--auth-border, #24302e);
   background: #ffffff;
   box-shadow: 0 16px 32px rgba(16, 24, 40, 0.16);
+}
+
+.select-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 14.5px;
+  border-radius: 7px;
+  border: 1px solid var(--auth-border, #24302e);
+  background: #ffffff;
+  color: var(--auth-text, #eef4f2);
+}
+
+.select-search:focus {
+  outline: none;
+  border-color: var(--auth-teal, #14b8a6);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+}
+
+.select-empty {
+  margin: 0;
+  padding: 12px 10px;
+  font-size: 14px;
+  color: var(--auth-muted, #5b6664);
+}
+
+.select-options {
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   scrollbar-width: thin;
   scrollbar-color: rgba(15, 118, 110, 0.4) transparent;
 }
