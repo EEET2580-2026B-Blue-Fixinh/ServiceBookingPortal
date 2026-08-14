@@ -1,23 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchProvinces, fetchProvinceWithDistrictsAndWards } from '../services/vietnamAddressApi'
+import { fetchProvinces } from '../services/api/endpoints/referenceEndpoints'
+import { fetchProvinceWithWards } from '../services/vietnamAddressApi'
 
-// Owns the cascading city/district/ward selection for Vietnam addresses:
-// fetches provinces on mount, fetches a province's districts+wards whenever
-// its city changes, and resets the narrower fields when a broader one changes.
+// Owns the cascading city/ward selection for Vietnam addresses.
+//
+// Two levels, not three — the district tier was abolished in the 2025 reform, so
+// wards hang directly off a province.
+//
+// The two levels come from different places on purpose: provinces from our own
+// backend, because it defines the provinceCode registration sends and which
+// regional store a customer lands in; wards from the public address API, which
+// the backend does not mirror. The province's `officialCode` is what joins them.
 export function useVietnamAddress() {
   const [city, setCity] = useState('')
-  const [district, setDistrict] = useState('')
   const [ward, setWard] = useState('')
 
   const [provinces, setProvinces] = useState([])
   const [provincesStatus, setProvincesStatus] = useState('loading')
 
-  const [districts, setDistricts] = useState([])
-  const [districtsStatus, setDistrictsStatus] = useState('idle')
+  const [wards, setWards] = useState([])
+  const [wardsStatus, setWardsStatus] = useState('idle')
 
   const provinceByName = useMemo(
-    () => Object.fromEntries(provinces.map((province) => [province.name, province])),
+    () => Object.fromEntries(provinces.map((province) => [province.provinceName, province])),
     [provinces],
+  )
+
+  // What the API stores as address.provinceCode — e.g. "HCM". The name is for
+  // display only; it is the code that is sent.
+  const cityCode = useMemo(
+    () => (city ? (provinceByName[city]?.provinceCode ?? '') : ''),
+    [city, provinceByName],
   )
 
   // Only setState inside the promise callback here, never synchronously in the
@@ -40,53 +53,42 @@ export function useVietnamAddress() {
     loadProvinces()
   }
 
-  const loadDistricts = useCallback(
+  const loadWards = useCallback(
     (cityName) => {
       const province = provinceByName[cityName]
       if (!province) return
-      fetchProvinceWithDistrictsAndWards(province.code)
+      fetchProvinceWithWards(province.officialCode)
         .then((data) => {
-          setDistricts(data.districts ?? [])
-          setDistrictsStatus('ready')
+          setWards(data.wards ?? [])
+          setWardsStatus('ready')
         })
-        .catch(() => setDistrictsStatus('error'))
+        .catch(() => setWardsStatus('error'))
     },
     [provinceByName],
   )
 
-  const retryDistricts = () => {
-    setDistrictsStatus('loading')
-    loadDistricts(city)
+  const retryWards = () => {
+    setWardsStatus('loading')
+    loadWards(city)
   }
 
-  // City is only ever changed by this handler, so the district fetch is
-  // triggered directly here instead of watched for via an effect.
+  // City is only ever changed by this handler, so the ward fetch is triggered
+  // directly here instead of watched for via an effect.
   const handleCityChange = (value) => {
     setCity(value)
-    setDistrict('')
     setWard('')
-    setDistricts([])
+    setWards([])
     if (value) {
-      setDistrictsStatus('loading')
-      loadDistricts(value)
+      setWardsStatus('loading')
+      loadWards(value)
     } else {
-      setDistrictsStatus('idle')
+      setWardsStatus('idle')
     }
-  }
-
-  const handleDistrictChange = (value) => {
-    setDistrict(value)
-    setWard('')
   }
 
   const handleWardChange = (value) => {
     setWard(value)
   }
-
-  const wards = useMemo(
-    () => districts.find((d) => d.name === district)?.wards ?? [],
-    [districts, district],
-  )
 
   const cityPlaceholder =
     provincesStatus === 'loading'
@@ -95,32 +97,27 @@ export function useVietnamAddress() {
         ? "Couldn't load provinces"
         : 'Select city / province'
 
-  const districtPlaceholder = !city
-    ? 'Select province first'
-    : districtsStatus === 'loading'
-      ? 'Loading districts…'
-      : districtsStatus === 'error'
-        ? "Couldn't load districts"
-        : 'Select district'
-
-  const wardPlaceholder = !district ? 'Select district first' : 'Select ward'
+  const wardPlaceholder = !city
+    ? 'Select city first'
+    : wardsStatus === 'loading'
+      ? 'Loading wards…'
+      : wardsStatus === 'error'
+        ? "Couldn't load wards"
+        : 'Select ward'
 
   return {
     city,
-    district,
+    cityCode,
     ward,
     provinces,
-    districts,
     wards,
     provincesStatus,
-    districtsStatus,
+    wardsStatus,
     cityPlaceholder,
-    districtPlaceholder,
     wardPlaceholder,
     handleCityChange,
-    handleDistrictChange,
     handleWardChange,
     retryProvinces,
-    retryDistricts,
+    retryWards,
   }
 }

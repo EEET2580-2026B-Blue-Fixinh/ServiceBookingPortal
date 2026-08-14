@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { SHOW_DEMO_ACCOUNT } from '../../config/env'
 import { AuthLayout } from '../../components/auth/AuthLayout'
 import { AuthIntro } from '../../components/auth/AuthIntro'
 import { GoogleIcon, MaterialIcon } from '../../components/shared/icons'
 import { isValidLoginIdentifier } from '../../utils/validators'
+import { useAuth } from '../../context/AuthContext'
+import { login as requestLogin } from '../../services/api/endpoints/authEndpoints'
 
 const DEMO_CUSTOMER_EMAIL = 'an.nguyen@gmail.com'
 const DEMO_CUSTOMER_PASSWORD = 'Fixinh@2025'
@@ -15,15 +17,23 @@ export function LoginPage() {
   const [form, setForm] = useState({ identifier: '', password: '' })
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const { login: startSession } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
     setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev))
+    setFormError('')
   }
 
   const handleFillDemoAccount = (role) => {
     setErrors({})
+    setFormError('')
     if (role === 'admin') {
       setForm({ identifier: DEMO_ADMIN_EMAIL, password: DEMO_ADMIN_PASSWORD })
     } else {
@@ -31,7 +41,7 @@ export function LoginPage() {
     }
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     const nextErrors = {}
@@ -44,7 +54,27 @@ export function LoginPage() {
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    // TODO: wire up to authEndpoints once the API client is implemented
+    setSubmitting(true)
+    setFormError('')
+    try {
+      const session = await requestLogin({
+        identifier: form.identifier.trim(),
+        password: form.password,
+      })
+
+      startSession(session.accessToken, session.user)
+
+      // Back to whatever ProtectedRoute bounced them away from, or to the
+      // booking page as the default landing spot after signing in.
+      const intended = location.state?.from?.pathname
+      navigate(intended ?? '/booking', { replace: true })
+    } catch (error) {
+      // The backend answers an unknown identifier and a wrong password
+      // identically on purpose, so there is one message to show for both.
+      setFormError(error.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleGoogleLogin = () => {
@@ -61,6 +91,12 @@ export function LoginPage() {
       <p className="auth-subtitle">Use the email or phone number on your Fixinh account.</p>
 
       <form onSubmit={handleSubmit} noValidate>
+        {formError && (
+          <p className="auth-form-error" role="alert">
+            {formError}
+          </p>
+        )}
+
         <div className="auth-field">
           <label htmlFor="identifier">Email or phone number</label>
           <input
@@ -110,8 +146,8 @@ export function LoginPage() {
           {errors.password && <p className="auth-error-text">{errors.password}</p>}
         </div>
 
-        <button className="auth-submit" type="submit">
-          Sign in
+        <button className="auth-submit" type="submit" disabled={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
 

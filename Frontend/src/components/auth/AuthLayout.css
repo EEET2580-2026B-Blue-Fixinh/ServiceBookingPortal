@@ -357,6 +357,27 @@
   background: var(--auth-teal-strong);
 }
 
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-submit:disabled:hover {
+  background: var(--auth-teal);
+}
+
+/* Whole-form failure — a rejected sign-in, or a server that cannot be reached.
+   Field-level problems use .auth-error-text under the field itself. */
+.auth-form-error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13.5px;
+}
+
 .auth-divider {
   display: flex;
   align-items: center;

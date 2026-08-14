@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useVietnamAddress } from '../../hooks/useVietnamAddress'
+import { register as requestRegister } from '../../services/api/endpoints/authEndpoints'
 import { AuthLayout } from '../../components/auth/AuthLayout'
 import { AuthIntro } from '../../components/auth/AuthIntro'
 import { GoogleIcon, MaterialIcon } from '../../components/shared/icons'
@@ -13,6 +14,8 @@ import {
 } from '../../utils/validators'
 
 const INITIAL_FORM = {
+  lastName: '',
+  firstName: '',
   email: '',
   phone: '',
   password: '',
@@ -21,20 +24,52 @@ const INITIAL_FORM = {
   streetName: '',
 }
 
+// Which form field a backend fieldErrors[] entry belongs to (Section 2.7).
+// Address violations surface on the city select, the only address control that
+// can be wrong in a way the customer can act on. The API carries one fullName,
+// so a complaint about it is shown against the first of the two name inputs.
+const FIELD_BY_BACKEND_NAME = {
+  fullName: 'lastName',
+  email: 'email',
+  phoneNumber: 'phone',
+  password: 'password',
+  confirmPassword: 'confirmPassword',
+  address: 'city',
+  'address.provinceCode': 'city',
+}
+
+// The API accepts 7-11 digits starting with 0, so the +84 form the validator
+// also allows has to be converted before it is sent.
+function toLocalPhoneNumber(value) {
+  const digitsOnly = value.trim().replace(/[\s.-]/g, '')
+  return digitsOnly.startsWith('+84') ? `0${digitsOnly.slice(3)}` : digitsOnly
+}
+
+// Vietnamese names are written family name first: "Nguyen Hong Anh" is
+// Nguyen (ho) + Hong Anh (ten dem + ten). The API stores the single fullName
+// this produces, so the join order is what makes the stored name correct.
+function toFullName({ lastName, firstName }) {
+  return `${lastName.trim()} ${firstName.trim()}`.trim()
+}
+
 export function RegisterPage() {
   const [form, setForm] = useState(INITIAL_FORM)
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const address = useVietnamAddress()
+  const navigate = useNavigate()
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
     setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev))
+    setFormError('')
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     // The email field keeps type="email" so the browser's own parser
@@ -43,6 +78,17 @@ export function RegisterPage() {
     const emailInput = event.currentTarget.elements.email
 
     const nextErrors = {}
+    const fullName = toFullName(form)
+    if (!form.lastName.trim()) {
+      nextErrors.lastName = 'Enter your last name.'
+    }
+    if (!form.firstName.trim()) {
+      nextErrors.firstName = 'Enter your first name.'
+    }
+    // The API's rule applies to the joined name, not to either half.
+    if (form.lastName.trim() && form.firstName.trim() && fullName.length > 100) {
+      nextErrors.firstName = 'Your full name must be 100 characters or fewer.'
+    }
     if (!emailInput.validity.valid) {
       nextErrors.email = 'Enter a valid email address.'
     }
@@ -61,10 +107,54 @@ export function RegisterPage() {
     if (!form.streetName.trim()) {
       nextErrors.streetName = 'Enter your street name.'
     }
+    if (!address.city) {
+      nextErrors.city = 'Select your city or province.'
+    }
+    if (!address.ward) {
+      nextErrors.ward = 'Select your ward.'
+    }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
-    // TODO: wire up to authEndpoints once the API client is implemented
+    setSubmitting(true)
+    setFormError('')
+    try {
+      await requestRegister({
+        email: form.email.trim(),
+        phoneNumber: toLocalPhoneNumber(form.phone),
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        fullName,
+        address: {
+          streetNumber: form.streetNumber.trim(),
+          streetName: form.streetName.trim(),
+          ward: address.ward,
+          provinceCode: address.cityCode,
+        },
+      })
+
+      // No token comes back: registration ends at the login screen, which keeps
+      // one path for issuing tokens.
+      navigate('/login', { replace: true })
+    } catch (error) {
+      // The backend validates everything again and names each failing field, so
+      // prefer its per-field messages over one generic banner.
+      const backendFieldErrors = error.fieldErrorsByField?.() ?? {}
+      const mapped = {}
+      for (const [backendField, message] of Object.entries(backendFieldErrors)) {
+        const formField = FIELD_BY_BACKEND_NAME[backendField]
+        if (formField) {
+          mapped[formField] = message
+        }
+      }
+
+      setErrors(mapped)
+      if (Object.keys(mapped).length === 0) {
+        setFormError(error.message)
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleGoogleSignup = () => {
@@ -79,6 +169,49 @@ export function RegisterPage() {
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
+        {formError && (
+          <p className="auth-form-error" role="alert">
+            {formError}
+          </p>
+        )}
+
+        {/* Family name first, the order Vietnamese names are written in — the
+            two halves are joined in this order to form the stored fullName. */}
+        <div className="auth-row">
+          <div className="auth-field">
+            <label htmlFor="lastName">Last name</label>
+            <input
+              id="lastName"
+              name="lastName"
+              type="text"
+              autoComplete="family-name"
+              placeholder="Nguyen"
+              value={form.lastName}
+              onChange={handleChange}
+              aria-invalid={Boolean(errors.lastName)}
+              className={errors.lastName ? 'auth-input-invalid' : ''}
+              required
+            />
+            {errors.lastName && <p className="auth-error-text">{errors.lastName}</p>}
+          </div>
+          <div className="auth-field">
+            <label htmlFor="firstName">First name</label>
+            <input
+              id="firstName"
+              name="firstName"
+              type="text"
+              autoComplete="given-name"
+              placeholder="Hong Anh"
+              value={form.firstName}
+              onChange={handleChange}
+              aria-invalid={Boolean(errors.firstName)}
+              className={errors.firstName ? 'auth-input-invalid' : ''}
+              required
+            />
+            {errors.firstName && <p className="auth-error-text">{errors.firstName}</p>}
+          </div>
+        </div>
+
         <div className="auth-field">
           <label htmlFor="email">Email</label>
           <input
@@ -218,6 +351,8 @@ export function RegisterPage() {
           </div>
         </div>
 
+        {/* Two levels only: the district tier was abolished in the 2025 reform,
+            so wards hang directly off the city / province. */}
         <div className="auth-row">
           <div className="auth-field">
             <label htmlFor="city">City / Province</label>
@@ -225,10 +360,11 @@ export function RegisterPage() {
               id="city"
               value={address.city}
               onChange={address.handleCityChange}
-              options={address.provinces.map((province) => province.name)}
+              options={address.provinces.map((province) => province.provinceName)}
               placeholder={address.cityPlaceholder}
               disabled={address.provincesStatus !== 'ready'}
             />
+            {errors.city && <p className="auth-error-text">{errors.city}</p>}
             {address.provincesStatus === 'error' && (
               <p className="auth-field-hint">
                 Couldn't load provinces.
@@ -239,19 +375,20 @@ export function RegisterPage() {
             )}
           </div>
           <div className="auth-field">
-            <label htmlFor="district">District</label>
+            <label htmlFor="ward">Ward</label>
             <SelectField
-              id="district"
-              value={address.district}
-              onChange={address.handleDistrictChange}
-              options={address.districts.map((district) => district.name)}
-              placeholder={address.districtPlaceholder}
-              disabled={!address.city || address.districtsStatus !== 'ready'}
+              id="ward"
+              value={address.ward}
+              onChange={address.handleWardChange}
+              options={address.wards.map((ward) => ward.name)}
+              placeholder={address.wardPlaceholder}
+              disabled={!address.city || address.wardsStatus !== 'ready'}
             />
-            {address.districtsStatus === 'error' && (
+            {errors.ward && <p className="auth-error-text">{errors.ward}</p>}
+            {address.wardsStatus === 'error' && (
               <p className="auth-field-hint">
-                Couldn't load districts.
-                <button type="button" onClick={address.retryDistricts}>
+                Couldn't load wards.
+                <button type="button" onClick={address.retryWards}>
                   Retry
                 </button>
               </p>
@@ -259,20 +396,8 @@ export function RegisterPage() {
           </div>
         </div>
 
-        <div className="auth-field">
-          <label htmlFor="ward">Ward</label>
-          <SelectField
-            id="ward"
-            value={address.ward}
-            onChange={address.handleWardChange}
-            options={address.wards.map((ward) => ward.name)}
-            placeholder={address.wardPlaceholder}
-            disabled={!address.district}
-          />
-        </div>
-
-        <button className="auth-submit" type="submit">
-          Create account
+        <button className="auth-submit" type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
 

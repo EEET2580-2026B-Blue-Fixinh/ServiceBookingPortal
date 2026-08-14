@@ -45,7 +45,9 @@ fixinh:
 
     cors:
       # Req A.2.6: restrictive CORS, no wildcard origins.
-      allowed-origins: ${CORS_ALLOWED_ORIGINS:https://localhost:5173}
+      # Port 3000 is fixed by the API contract (Section 2.1) and by the frontend's own
+      # vite.config.js — it is the only origin this policy admits.
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:https://localhost:3000,http://localhost:3000}
 
     cloudinary:
       # Req 3.3.M1, 3.4.M1: images are relayed through the backend, never

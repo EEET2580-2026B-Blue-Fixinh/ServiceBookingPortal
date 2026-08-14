@@ -1,4 +1,105 @@
 package com.fixinh.sbp.common.exception;
 
-public class ErrorCode {
+import org.springframework.http.HttpStatus;
+
+import lombok.Getter;
+
+/**
+ * The error vocabulary clients branch on (API Documentation Appendix B and C).
+ *
+ * <p>Clients branch on these names — never on {@code message}, which is written for people
+ * and will be reworded.
+ *
+ * <p>Two kinds of code live here:
+ * <ul>
+ *   <li><b>Top-level</b> codes land in {@code ErrorResponse.error} and carry the HTTP status.</li>
+ *   <li><b>Field-level</b> codes (Appendix C) land in {@code fieldErrors[].code}. They always roll
+ *       up into a 400 VALIDATION_FAILED response, and carry the {@code example} text the API
+ *       returns so the frontend never has to invent wording.</li>
+ * </ul>
+ *
+ * <p>Only the codes the auth slice actually raises are defined. Later tasks add their own
+ * (booking, rating, integration, ...) as they need them.
+ */
+@Getter
+public enum ErrorCode {
+
+	// --- Top-level: authentication and authorisation ---
+	AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED,
+			"Email, phone number or password is incorrect."),
+	AUTH_TOKEN_MISSING(HttpStatus.UNAUTHORIZED,
+			"Authentication is required to access this resource."),
+	AUTH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED,
+			"The access token is malformed or its signature does not match."),
+	AUTH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED,
+			"The access token has expired. Please sign in again."),
+	AUTH_ACCOUNT_DEACTIVATED(HttpStatus.FORBIDDEN,
+			"This account has been deactivated."),
+
+	// --- Top-level: validation and conflicts ---
+	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "One or more fields are invalid."),
+	EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "This email is already registered."),
+	PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "This phone number is already registered."),
+
+	/**
+	 * Defined so the catalogue is complete, but no limiter is wired yet — login rate limiting
+	 * is a deliberate follow-up, not part of this slice.
+	 */
+	RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "Too many requests. Please wait and try again."),
+
+	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,
+			"Something went wrong on our side. Quote the traceId when reporting it."),
+
+	// --- Field-level: password (Req 3.1.M1) ---
+	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,
+			"Password must be at least 8 characters.", "Fixinh@2026"),
+	PASSWORD_MISSING_DIGIT(HttpStatus.BAD_REQUEST,
+			"Password must contain at least one number.", "Fixinh@2026"),
+	PASSWORD_MISSING_SPECIAL_CHARACTER(HttpStatus.BAD_REQUEST,
+			"Password must contain at least one special character such as $ # @ !.", "Fixinh@2026"),
+	PASSWORD_MISSING_UPPERCASE(HttpStatus.BAD_REQUEST,
+			"Password must contain at least one capital letter.", "Fixinh@2026"),
+	PASSWORD_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST,
+			"The two passwords do not match.", "Type the same value twice."),
+
+	// --- Field-level: email (Req 3.1.M2) ---
+	EMAIL_AT_SYMBOL_INVALID(HttpStatus.BAD_REQUEST,
+			"Email must contain exactly one @ symbol.", "an.nguyen@example.com"),
+	EMAIL_DOMAIN_INVALID(HttpStatus.BAD_REQUEST,
+			"Email must contain a dot after the @ symbol.", "an.nguyen@example.com"),
+	EMAIL_TOO_LONG(HttpStatus.BAD_REQUEST,
+			"Email must be shorter than 255 characters.", "an.nguyen@example.com"),
+	EMAIL_ILLEGAL_CHARACTER(HttpStatus.BAD_REQUEST,
+			"Email must not contain spaces or the characters ( ) ; : .", "an.nguyen@example.com"),
+
+	// --- Field-level: phone, name, address (Reqs 3.1.M3, 3.1.S3, 3.1.S4) ---
+	PHONE_LENGTH_INVALID(HttpStatus.BAD_REQUEST,
+			"Phone number must be between 7 and 11 digits.", "0912345678"),
+	PHONE_PREFIX_INVALID(HttpStatus.BAD_REQUEST,
+			"Phone number must start with 0.", "0912345678"),
+	PHONE_ILLEGAL_CHARACTER(HttpStatus.BAD_REQUEST,
+			"Phone number must contain digits only.", "0912345678"),
+	NAME_LENGTH_INVALID(HttpStatus.BAD_REQUEST,
+			"Full name must be between 2 and 100 characters.", "Nguyen Hong Anh"),
+	ADDRESS_INCOMPLETE(HttpStatus.BAD_REQUEST,
+			"Address needs street number, street name, ward and city.",
+			"123, Green Street, Ward 5, Ho Chi Minh City"),
+	PROVINCE_CODE_INVALID(HttpStatus.BAD_REQUEST,
+			"Choose a city from the list.", "HCM");
+
+	private final HttpStatus httpStatus;
+	private final String message;
+
+	/** Appendix C's "example" column. Null for top-level codes, which have no field to fix. */
+	private final String example;
+
+	ErrorCode(HttpStatus httpStatus, String message) {
+		this(httpStatus, message, null);
+	}
+
+	ErrorCode(HttpStatus httpStatus, String message, String example) {
+		this.httpStatus = httpStatus;
+		this.message = message;
+		this.example = example;
+	}
 }
