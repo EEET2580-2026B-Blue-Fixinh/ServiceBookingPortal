@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from '../auth/LoginPage'
 import { RegisterPage } from '../auth/RegisterPage'
 import { ProtectedRoute } from './ProtectedRoute'
-import BookingPage from '../booking/BookingPage'
+import { MyBookingsPage } from '../booking/MyBookingsPage'
 
 export function AppRoutes() {
   return (
@@ -15,7 +15,7 @@ export function AppRoutes() {
           these calls without a token anyway — this just means the visitor is
           sent to sign in instead of meeting a page that cannot load. */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/booking" element={<BookingPage />} />
+        <Route path="/booking" element={<MyBookingsPage />} />
       </Route>
     </Routes>
   )
