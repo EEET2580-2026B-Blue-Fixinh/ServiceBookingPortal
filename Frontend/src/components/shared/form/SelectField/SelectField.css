@@ -8,6 +8,11 @@
 }
 
 .select-trigger {
+  /* `color-scheme: light dark` (index.css) makes WebKit render a native
+     <button>'s text with the OS's dark control color instead of the
+     `color` below, unless its default appearance is turned off first. */
+  appearance: none;
+  -webkit-appearance: none;
   width: 100%;
   display: flex;
   align-items: center;
