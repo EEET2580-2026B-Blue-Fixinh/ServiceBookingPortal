@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.customer.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -20,6 +21,12 @@ public interface CustomerRepository {
 	Optional<Customer> findByEmail(String email);
 
 	Optional<Customer> findByPhoneNumber(String phoneNumber);
+
+	/** The authoritative (full-profile) copy, wherever its home shard is. */
+	Optional<Customer> findById(String id);
+
+	/** Every customer system-wide, authoritative copy only — never the sign-in replica. */
+	List<Customer> findAll();
 
 	boolean existsByEmail(String email);
 

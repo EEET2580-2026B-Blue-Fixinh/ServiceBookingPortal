@@ -1,5 +1,7 @@
 package com.fixinh.sbp.modules.customer.repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -90,6 +92,43 @@ public class ShardedCustomerRepository implements CustomerRepository {
 	@Override
 	public boolean existsByPhoneNumber(String phoneNumber) {
 		return findByPhoneNumber(phoneNumber).isPresent();
+	}
+
+	/**
+	 * Looks up by id in both stores and prefers whichever copy carries the profile ({@code
+	 * address != null}), since one of the two is always just the sign-in replica.
+	 */
+	@Override
+	public Optional<Customer> findById(String id) {
+		if (id == null || id.isBlank()) {
+			return Optional.empty();
+		}
+
+		Customer southMatch = south.findById(id, Customer.class);
+		if (southMatch != null && southMatch.getAddress() != null) {
+			return Optional.of(southMatch);
+		}
+
+		Customer northMatch = north.findById(id, Customer.class);
+		if (northMatch != null && northMatch.getAddress() != null) {
+			return Optional.of(northMatch);
+		}
+
+		return Optional.ofNullable(southMatch != null ? southMatch : northMatch);
+	}
+
+	/**
+	 * Each store holds an authoritative copy for its own region plus a sign-in replica for the
+	 * other, and both carry the same {@code homeRegion} value — so filtering each store to the
+	 * documents whose {@code homeRegion} matches that store returns exactly one, full-profile row
+	 * per customer system-wide.
+	 */
+	@Override
+	public List<Customer> findAll() {
+		List<Customer> all = new ArrayList<>();
+		all.addAll(south.find(Query.query(Criteria.where("homeRegion").is(Region.SOUTH)), Customer.class));
+		all.addAll(north.find(Query.query(Criteria.where("homeRegion").is(Region.NORTH)), Customer.class));
+		return all;
 	}
 
 	/**
