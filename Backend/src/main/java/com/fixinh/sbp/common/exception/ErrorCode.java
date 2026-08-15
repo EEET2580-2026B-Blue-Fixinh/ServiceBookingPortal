@@ -41,6 +41,9 @@ public enum ErrorCode {
 	EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "This email is already registered."),
 	PHONE_ALREADY_REGISTERED(HttpStatus.CONFLICT, "This phone number is already registered."),
 
+	// --- Top-level: admin (Req 3.5.S2) ---
+	CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "No customer exists with this id."),
+
 	/**
 	 * Defined so the catalogue is complete, but no limiter is wired yet — login rate limiting
 	 * is a deliberate follow-up, not part of this slice.

@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.sharding.RegionResolver;
+import com.fixinh.sbp.modules.customer.dto.external.CustomerDto;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.AccountStatus;
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -22,12 +24,13 @@ import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The customer module's own logic. Only the parts registration and sign-in need are implemented
- * here; profile read/update (GET and PUT /customers/me) belong to a separate task.
+ * The customer module's own logic. Only the parts registration, sign-in, and admin account
+ * management need are implemented here; profile read/update (GET and PUT /customers/me) belong
+ * to a separate task.
  */
 @Service
 @RequiredArgsConstructor
-public class CustomerServiceImpl implements CustomerInternalService {
+public class CustomerServiceImpl implements CustomerInternalService, CustomerExternalService {
 
 	/** Anything that looks like a phone number rather than an email: digits, optionally spaced. */
 	private static final String DIGITS_ONLY = "\\d+";
@@ -90,6 +93,23 @@ public class CustomerServiceImpl implements CustomerInternalService {
 	@Override
 	public boolean phoneExists(String phoneNumber) {
 		return customerRepository.existsByPhoneNumber(phoneNumber);
+	}
+
+	@Override
+	public List<CustomerDto> listAll() {
+		return customerRepository.findAll().stream()
+				.map(CustomerDto::from)
+				.toList();
+	}
+
+	@Override
+	public CustomerDto setAccountStatus(String customerId, AccountStatus status) {
+		Customer customer = customerRepository.findById(customerId)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+		customer.setAccountStatus(status);
+
+		return CustomerDto.from(customerRepository.save(customer));
 	}
 
 	private String normaliseEmail(String email) {
