@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AdminShell } from '../../components/admin/AdminShell'
+import { ConfirmDialog } from '../../components/shared/ConfirmDialog'
 import { MaterialIcon } from '../../components/shared/icons'
 import { fetchCustomers, setCustomerStatus } from '../../services/api/endpoints/adminEndpoints'
 import { fetchProvinces } from '../../services/api/endpoints/referenceEndpoints'
@@ -38,6 +39,7 @@ export function AdminCustomersPage() {
   const [error, setError] = useState('')
   const [pendingId, setPendingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState(null)
 
   useEffect(() => {
     fetchCustomers()
@@ -52,7 +54,8 @@ export function AdminCustomersPage() {
       .catch(() => {})
   }, [])
 
-  const handleToggleStatus = async (customer) => {
+  const handleConfirmToggle = async () => {
+    const customer = confirmTarget
     const nextStatus = customer.accountStatus === 'ACTIVE' ? 'DEACTIVATED' : 'ACTIVE'
     setPendingId(customer.customerId)
     try {
@@ -60,6 +63,7 @@ export function AdminCustomersPage() {
       setCustomers((prev) =>
         prev.map((c) => (c.customerId === updated.customerId ? updated : c)),
       )
+      setConfirmTarget(null)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -155,7 +159,7 @@ export function AdminCustomersPage() {
                     <button
                       type="button"
                       disabled={pendingId === customer.customerId}
-                      onClick={() => handleToggleStatus(customer)}
+                      onClick={() => setConfirmTarget(customer)}
                       className={`appearance-none rounded-[9px] border px-3.5 py-2 text-[13px] font-bold disabled:opacity-50 ${
                         customer.accountStatus === 'ACTIVE'
                           ? 'border-bk-border bg-bk-surface text-bk-red hover:border-bk-red hover:bg-bk-red-soft'
@@ -177,6 +181,25 @@ export function AdminCustomersPage() {
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmTarget != null}
+        title={
+          confirmTarget?.accountStatus === 'ACTIVE'
+            ? 'Deactivate this account?'
+            : 'Activate this account?'
+        }
+        description={
+          confirmTarget?.accountStatus === 'ACTIVE'
+            ? `${confirmTarget?.fullName} will no longer be able to sign in.`
+            : `${confirmTarget?.fullName} will be able to sign in again.`
+        }
+        confirmLabel={confirmTarget?.accountStatus === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+        danger={confirmTarget?.accountStatus === 'ACTIVE'}
+        pending={pendingId === confirmTarget?.customerId}
+        onConfirm={handleConfirmToggle}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </AdminShell>
   )
 }
