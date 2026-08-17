@@ -8,10 +8,5 @@ package com.fixinh.sbp.common.sharding;
  */
 public enum Region {
 	NORTH,
-	SOUTH;
-
-	/** The other shard. Used when writing the login-lookup replica (see CustomerRepository). */
-	public Region opposite() {
-		return this == NORTH ? SOUTH : NORTH;
-	}
+	SOUTH
 }

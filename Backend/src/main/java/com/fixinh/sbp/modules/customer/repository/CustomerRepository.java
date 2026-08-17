@@ -14,7 +14,7 @@ import com.fixinh.sbp.modules.customer.model.Customer;
  */
 public interface CustomerRepository {
 
-	/** Persists to the home shard and mirrors the sign-in fields to the other one. */
+	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
 
 	Optional<Customer> findByEmail(String email);

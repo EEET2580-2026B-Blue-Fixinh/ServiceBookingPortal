@@ -23,15 +23,13 @@ import lombok.Setter;
  * returns them as one resource (register's 201 body, GET /customers/me), so they are one
  * document here rather than two collections joined on every sign-in.
  *
- * <p><b>This document exists in both shards.</b> The shard named by {@link #homeRegion} holds the
- * authoritative copy; the other holds a replica carrying only the fields sign-in needs, so login
- * — which has an identifier but no province — never has to guess a region. See
- * {@code ShardedCustomerRepository}.
+ * <p><b>This document exists in exactly one shard</b> — the one named by {@link #homeRegion},
+ * resolved from the address province (Req 3.1.U1). Neither store holds customers belonging to the
+ * other region, so there is no copy to keep in step. See {@code ShardedCustomerRepository}.
  *
- * <p><b>Consequence for whoever builds PUT /customers/me:</b> a change to any replicated field
- * ({@code fullName}, {@code phoneNumber}, {@code accountStatus}, ...) must be written to both
- * shards, or the two copies drift. Only {@link #address} is safe to write to the home shard
- * alone, because the replica deliberately does not carry it.
+ * <p><b>Consequence for whoever builds PUT /customers/me:</b> every field can be written to the
+ * home shard alone. But changing the address province changes the owning region, which is a move
+ * between stores — an insert into the new shard and a delete from the old — not an update in place.
  */
 @Document(collection = "customers")
 @Getter
@@ -41,7 +39,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Customer {
 
-	/** Mongo's _id, and the customerId the API exposes. Identical across both shards. */
+	/** Mongo's _id, and the customerId the API exposes. */
 	@Id
 	private String id;
 
@@ -65,10 +63,7 @@ public class Customer {
 
 	private AccountStatus accountStatus;
 
-	/**
-	 * Present only in the {@link #homeRegion} shard; deliberately null on the replica, because
-	 * the address is the one genuinely region-owned part of the record.
-	 */
+	/** The province here is what decides {@link #homeRegion}, and so which store owns the record. */
 	private Address address;
 
 	/** How this account can sign in — PASSWORD, GOOGLE, or both (Appendix A). */
