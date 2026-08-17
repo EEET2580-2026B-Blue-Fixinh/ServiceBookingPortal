@@ -66,3 +66,10 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    mongodb:
+      enabled: false
+      
