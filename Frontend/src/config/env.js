@@ -9,3 +9,18 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:84
 // Flip VITE_SHOW_DEMO_ACCOUNT in .env (or .env.local for a personal-only
 // override) — set it to "false" before shipping to production.
 export const SHOW_DEMO_ACCOUNT = import.meta.env.VITE_SHOW_DEMO_ACCOUNT === 'true'
+
+// The seeded accounts the demo box fills in. Env-backed rather than committed
+// source: the switch above was already configuration, so the credentials it
+// reveals should be too. Empty when a developer has not copied .env.example,
+// which is why LoginPage checks for an address before rendering the box.
+export const DEMO_ACCOUNTS = {
+  customer: {
+    email: import.meta.env.VITE_DEMO_CUSTOMER_EMAIL ?? '',
+    password: import.meta.env.VITE_DEMO_CUSTOMER_PASSWORD ?? '',
+  },
+  admin: {
+    email: import.meta.env.VITE_DEMO_ADMIN_EMAIL ?? '',
+    password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD ?? '',
+  },
+}
