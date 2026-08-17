@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../../config/env'
-import { AUTH_TOKEN_KEY } from '../../config/constants'
+import { AUTH_TOKEN_KEY, SESSION_ENDING_ERROR_CODES } from '../../config/constants'
 
 // Req A.1.3: one utility centralises REST calls, headers and errors. Components
 // call the endpoint modules, never fetch() — so the base URL, the Authorization
@@ -35,6 +35,20 @@ export class ApiError extends Error {
 
 /** Status 0 is reserved for "the request never reached the server". */
 export const NETWORK_ERROR_STATUS = 0
+
+// Set by AuthProvider. This module is plain functions and cannot use hooks, so it
+// cannot end a session itself — it calls whatever is registered here. One slot
+// rather than an event bus: exactly one thing owns "the session ended", the same
+// way one thing owns the base URL and the error shape.
+let unauthorizedHandler = null
+
+/**
+ * Registers the callback that ends the session when the backend rejects our token.
+ * Pass null to unregister. AuthProvider is the only intended caller.
+ */
+export function setUnauthorizedHandler(handler) {
+  unauthorizedHandler = handler
+}
 
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = {}
@@ -75,7 +89,15 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new ApiError(response.status, payload)
+    const error = new ApiError(response.status, payload)
+
+    // The token we sent is dead, so the session is over however this call ends.
+    // Fired before the throw so it still happens if the caller swallows the error.
+    if (error.status === 401 && SESSION_ENDING_ERROR_CODES.includes(error.code)) {
+      unauthorizedHandler?.()
+    }
+
+    throw error
   }
 
   return payload
