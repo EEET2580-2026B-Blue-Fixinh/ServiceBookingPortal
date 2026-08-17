@@ -24,8 +24,10 @@ fixinh:
     jwt:
       # Req 3.2.M1-M3: JWT issuance/validation for protected resources.
       secret: ${JWT_SECRET:dev-only-change-me-please-32-bytes-minimum-secret}
-      issuer: fixinh-sbp
-      access-token-ttl-minutes: 60
+      issuer: ${JWT_ISSUER:fixinh-sbp}
+      # Shorten this to test the client's forced sign-out without waiting an hour:
+      # JWT_ACCESS_TOKEN_TTL_MINUTES=1. Also what /auth/login reports as expiresIn.
+      access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:1}
 
     mongo:
       # Req 3.1.U1/U2, 4.U1: Customer data is horizontally sharded by region.
