@@ -1,4 +1,5 @@
 import { apiClient } from '../apiClient'
+import { API_ENDPOINTS } from '../../../config/api'
 
 // API Documentation Section 5. Small, slow-changing lists that populate dropdowns.
 
@@ -12,6 +13,6 @@ import { apiClient } from '../apiClient'
  *   that province's wards against the public address API.
  */
 export async function fetchProvinces() {
-  const response = await apiClient.get('/reference/provinces', { auth: false })
+  const response = await apiClient.get(API_ENDPOINTS.REFERENCE.PROVINCES, { auth: false })
   return response.items
 }

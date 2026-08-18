@@ -1,6 +1,6 @@
 package com.fixinh.sbp.common.security.jwt;
 
-import com.fixinh.sbp.modules.customer.model.Role;
+import com.fixinh.sbp.common.security.Role;
 
 /**
  * The authenticated caller, rebuilt from the token's claims on every request.

@@ -15,7 +15,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
-import com.fixinh.sbp.modules.customer.model.Role;
+import com.fixinh.sbp.common.security.Role;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;

@@ -3,7 +3,9 @@ import { ROUTES } from '../../config/constants'
 import { LoginPage } from '../auth/LoginPage'
 import { RegisterPage } from '../auth/RegisterPage'
 import { ProtectedRoute } from './ProtectedRoute'
+import { AdminRoute } from './AdminRoute'
 import { MyBookingsPage } from '../booking/MyBookingsPage'
+import { AdminHomePage } from '../admin/AdminHomePage'
 
 export function AppRoutes() {
   return (
@@ -17,6 +19,13 @@ export function AppRoutes() {
           sent to sign in instead of meeting a page that cannot load. */}
       <Route element={<ProtectedRoute />}>
         <Route path={ROUTES.BOOKING} element={<MyBookingsPage />} />
+      </Route>
+
+      {/* Admins only. AdminRoute turns away a signed-in CUSTOMER as well as an
+          unauthenticated visitor, so this is a stricter nesting than above —
+          not an addition to it. */}
+      <Route element={<AdminRoute />}>
+        <Route path={ROUTES.ADMIN} element={<AdminHomePage />} />
       </Route>
     </Routes>
   )
