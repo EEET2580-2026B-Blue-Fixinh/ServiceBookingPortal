@@ -111,7 +111,7 @@ public class ShardMongoConfig {
 		if (database == null || database.isBlank()) {
 			throw new IllegalStateException(
 					"Mongo URI is missing a database name. Expected .../sbp_north or .../sbp_south "
-							+ "before the query string — see docs/MONGODB_SETUP.md step B2.");
+							+ "before the query string.");
 		}
 
 		MongoDatabaseFactory factory = new SimpleMongoClientDatabaseFactory(client, database);
