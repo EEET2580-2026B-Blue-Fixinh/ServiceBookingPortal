@@ -1,4 +1,4 @@
-package com.fixinh.sbp.modules.customer.model;
+package com.fixinh.sbp.common.security;
 
 /**
  * Whether the account may sign in (API Documentation Appendix A, Req 3.5.S2).

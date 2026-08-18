@@ -1,4 +1,4 @@
-package com.fixinh.sbp.modules.customer.model;
+package com.fixinh.sbp.common.security;
 
 /**
  * Account roles (API Documentation Appendix A).

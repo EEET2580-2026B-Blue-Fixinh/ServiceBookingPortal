@@ -6,24 +6,22 @@ import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
- * What other modules may ask of the customer module. The auth module uses this to create
- * accounts and to resolve a sign-in identifier.
+ * What other modules may ask of the customer module.
+ *
+ * <p>The auth module uses this to create a profile once it has written the credential, and to
+ * load a profile for an already-authenticated caller.
  */
 public interface CustomerInternalService {
 
 	/**
-	 * Hashes the password, files the customer in the shard its province belongs to, and mirrors
-	 * the sign-in fields to the other shard.
+	 * Files the profile in the shard its address province belongs to, under the id of the
+	 * credential that identifies it.
 	 *
-	 * @throws com.fixinh.sbp.common.exception.ApiException EMAIL_ALREADY_REGISTERED or
-	 *         PHONE_ALREADY_REGISTERED if either is taken (Req 3.1.S2)
+	 * <p>Runs no uniqueness check: the credential holds the unique email and phone, and it is
+	 * written first, so a duplicate has already been rejected before this is reached.
 	 */
-	Customer create(CustomerCreateCommand command);
+	Customer createProfile(CustomerCreateCommand command);
 
-	/** Resolves an email <em>or</em> phone number to an account — the /auth/login lookup. */
-	Optional<Customer> findByIdentifier(String identifier);
-
-	boolean emailExists(String email);
-
-	boolean phoneExists(String phoneNumber);
+	/** The profile behind a token's {@code sub}, or empty if this id is not a customer's. */
+	Optional<Customer> findById(String id);
 }

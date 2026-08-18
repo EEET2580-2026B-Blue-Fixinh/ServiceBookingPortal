@@ -1,4 +1,5 @@
 import { apiClient } from '../apiClient'
+import { API_ENDPOINTS } from '../../../config/api'
 
 // API Documentation Section 4. Both endpoints are public — a user must reach
 // registration and sign-in before holding a token — so they opt out of the
@@ -14,7 +15,7 @@ import { apiClient } from '../apiClient'
  *                    ward: string, provinceCode: string}}} payload
  */
 export function register(payload) {
-  return apiClient.post('/auth/register', payload, { auth: false })
+  return apiClient.post(API_ENDPOINTS.AUTH.REGISTER, payload, { auth: false })
 }
 
 /**
@@ -24,5 +25,5 @@ export function register(payload) {
  *        email address or a phone number; the server works out which.
  */
 export function login(credentials) {
-  return apiClient.post('/auth/login', credentials, { auth: false })
+  return apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials, { auth: false })
 }

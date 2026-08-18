@@ -2,8 +2,8 @@ package com.fixinh.sbp.modules.auth.dto.external;
 
 import java.time.Instant;
 
-import com.fixinh.sbp.modules.customer.model.AccountStatus;
-import com.fixinh.sbp.modules.customer.model.Role;
+import com.fixinh.sbp.common.security.AccountStatus;
+import com.fixinh.sbp.common.security.Role;
 
 /**
  * What a successful registration returns (API Documentation Section 4.1).

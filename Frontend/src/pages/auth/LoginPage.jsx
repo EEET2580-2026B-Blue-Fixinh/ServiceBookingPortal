@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { DEMO_ACCOUNTS, SHOW_DEMO_ACCOUNT } from '../../config/env'
-import { ROUTES, SESSION_EXPIRED_MESSAGE } from '../../config/constants'
+import { ROLES, ROUTES, SESSION_EXPIRED_MESSAGE } from '../../config/constants'
 import { AuthLayout } from '../../components/auth/AuthLayout'
 import { AuthIntro } from '../../components/auth/AuthIntro'
 import { GoogleIcon, MaterialIcon } from '../../components/shared/icons'
@@ -70,10 +70,19 @@ export function LoginPage() {
       // deadline it enforces, so a forced sign-out can happen without an API call.
       startSession(session.accessToken, session.user, session.expiresIn)
 
-      // Back to whatever ProtectedRoute bounced them away from, or to the
-      // booking page as the default landing spot after signing in.
+      // Where this account belongs when it has nowhere else to be: /booking lists
+      // the caller's own bookings, which an administrator does not have.
+      const isAdmin = session.user?.role === ROLES.ADMIN
+      const home = isAdmin ? ROUTES.ADMIN : ROUTES.BOOKING
+
+      // Return them to whatever a route guard bounced them off — but only if this
+      // account can actually go there. Someone signed out who tried /booking, then
+      // signed in as an administrator, must not be sent back to a page the guards
+      // would immediately bounce them off again.
       const intended = location.state?.from?.pathname
-      navigate(intended ?? ROUTES.BOOKING, { replace: true })
+      const canReturn = intended && intended.startsWith(ROUTES.ADMIN) === isAdmin
+
+      navigate(canReturn ? intended : home, { replace: true })
     } catch (error) {
       // The backend answers an unknown identifier and a wrong password
       // identically on purpose, so there is one message to show for both.
