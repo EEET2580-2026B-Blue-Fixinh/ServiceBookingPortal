@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
+import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.AccountStatus;
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -27,7 +29,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class CustomerServiceImpl implements CustomerInternalService {
+public class CustomerServiceImpl implements CustomerInternalService, CustomerExternalService {
 
 	/** Anything that looks like a phone number rather than an email: digits, optionally spaced. */
 	private static final String DIGITS_ONLY = "\\d+";
@@ -90,6 +92,11 @@ public class CustomerServiceImpl implements CustomerInternalService {
 	@Override
 	public boolean phoneExists(String phoneNumber) {
 		return customerRepository.existsByPhoneNumber(phoneNumber);
+	}
+
+	@Override
+	public Optional<Region> findHomeRegion(String customerId) {
+		return customerRepository.findById(customerId).map(Customer::getHomeRegion);
 	}
 
 	private String normaliseEmail(String email) {

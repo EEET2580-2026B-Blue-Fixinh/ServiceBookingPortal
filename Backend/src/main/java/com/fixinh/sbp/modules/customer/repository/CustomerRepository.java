@@ -17,6 +17,9 @@ public interface CustomerRepository {
 	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
 
+	/** Looked up by Mongo id, which carries no region either — checked south then north. */
+	Optional<Customer> findById(String id);
+
 	Optional<Customer> findByEmail(String email);
 
 	Optional<Customer> findByPhoneNumber(String phoneNumber);

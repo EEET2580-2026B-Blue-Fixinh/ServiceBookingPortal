@@ -1,0 +1,15 @@
+{
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot",
+      "default": true
+    }
+  ],
+  "maven.terminal.customEnv": [
+    {
+      "environmentVariable": "JAVA_HOME",
+      "value": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.8-hotspot"
+    }
+  ]
+}

@@ -54,6 +54,19 @@ public class ShardedCustomerRepository implements CustomerRepository {
 	}
 
 	@Override
+	public Optional<Customer> findById(String id) {
+		if (id == null || id.isBlank()) {
+			return Optional.empty();
+		}
+
+		Customer found = south.findById(id, Customer.class);
+		if (found == null) {
+			found = north.findById(id, Customer.class);
+		}
+		return Optional.ofNullable(found);
+	}
+
+	@Override
 	public Optional<Customer> findByEmail(String email) {
 		if (email == null || email.isBlank()) {
 			return Optional.empty();
