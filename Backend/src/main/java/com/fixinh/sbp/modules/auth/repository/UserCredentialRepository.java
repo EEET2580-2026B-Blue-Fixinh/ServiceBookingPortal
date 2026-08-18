@@ -74,6 +74,28 @@ public class UserCredentialRepository {
 	}
 
 	/**
+	 * Finds a credential by its ID across both stores.
+	 *
+	 * <p>Used when updating a credential's homeRegion after a Google user completes their
+	 * profile (Req 3.2.U3).
+	 */
+	public Optional<UserCredential> findById(String id) {
+		if (id == null || id.isBlank()) {
+			return Optional.empty();
+		}
+		return findOne(Criteria.where("_id").is(id.trim()));
+	}
+
+	/**
+	 * Deletes a credential from the appropriate store.
+	 *
+	 * <p>Used for rollback when profile creation fails during Google OAuth sign-in.
+	 */
+	public void delete(UserCredential credential) {
+		templateFor(credential.getHomeRegion()).remove(credential);
+	}
+
+	/**
 	 * Checks south, then north, and stops at the first hit. Because a credential exists in only
 	 * one store, whichever answers holds the authoritative document.
 	 */

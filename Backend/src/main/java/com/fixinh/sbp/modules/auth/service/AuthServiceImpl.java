@@ -2,9 +2,9 @@ package com.fixinh.sbp.modules.auth.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
@@ -20,25 +20,31 @@ import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
+import com.fixinh.sbp.modules.auth.dto.internal.CompleteProfileCommand;
+import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
+import com.fixinh.sbp.modules.auth.model.AuthProvider;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
+import com.fixinh.sbp.modules.auth.service.GoogleOAuthService.GoogleUserInfo;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
-/** Registration and sign-in (API Documentation Sections 4.1 and 4.2). */
+/** Registration and sign-in (API Documentation Sections 4.1, 4.2, 4.3). */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServiceImpl implements AuthExternalService {
 
 	private static final String TOKEN_TYPE_BEARER = "Bearer";
-	private static final String PROVIDER_PASSWORD = "PASSWORD";
 
 	/** Anything that looks like a phone number rather than an email address. */
 	private static final String DIGITS_ONLY = "\\d+";
@@ -50,6 +56,7 @@ public class AuthServiceImpl implements AuthExternalService {
 	private final AccountProfileReader profileReader;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider tokenProvider;
+	private final GoogleOAuthService googleOAuthService;
 
 	@Override
 	public RegisteredCustomerDto register(RegisterCommand command) {
@@ -93,7 +100,7 @@ public class AuthServiceImpl implements AuthExternalService {
 				.passwordHash(passwordEncoder.encode(command.password()))
 				.accountStatus(AccountStatus.ACTIVE)
 				.accountRole(Role.CUSTOMER)
-				.authProviders(List.of(PROVIDER_PASSWORD))
+				.authProviders(Set.of(AuthProvider.PASSWORD))
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 				.homeRegion(homeRegion)
 				.build();
@@ -151,6 +158,121 @@ public class AuthServiceImpl implements AuthExternalService {
 						credential.getAccountRole()));
 	}
 
+	@Override
+	public AuthTokenDto loginWithGoogle(GoogleLoginCommand command) {
+		// Exchange authorization code for verified Google user profile
+		GoogleUserInfo googleUser = googleOAuthService.verifyCodeAndGetUser(command.code());
+		String email = googleUser.email().trim().toLowerCase(Locale.ROOT);
+
+		// Try to find existing account by email (check both regions)
+		Optional<UserCredential> existingCredential = credentialRepository.findByEmail(email);
+
+		boolean accountCreated = false;
+		boolean profileCompletionRequired = false;
+		UserCredential credential;
+
+		if (existingCredential.isPresent()) {
+			// Existing account - add GOOGLE provider if not already present
+			credential = existingCredential.get();
+			
+			if (!credential.getAuthProviders().contains(AuthProvider.GOOGLE)) {
+				credential.getAuthProviders().add(AuthProvider.GOOGLE);
+				credentialRepository.save(credential);
+			}
+		} else {
+			// New account - create credential without password and without profile (no address yet)
+			accountCreated = true;
+			profileCompletionRequired = true;
+			
+			String userId = ObjectId.get().toHexString();
+			
+			credential = UserCredential.builder()
+					.id(userId)
+					.email(email)
+					.phoneNumber(null) // No phone number from Google
+					.passwordHash(null) // Google-only accounts have no password
+					.accountStatus(AccountStatus.ACTIVE)
+					.accountRole(Role.CUSTOMER)
+					.authProviders(Set.of(AuthProvider.GOOGLE))
+					.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+					// Google users start in south region until they add address (Req 3.2.U3)
+					.homeRegion(Region.SOUTH)
+					.build();
+			
+			// Save credential first (profile will be created when user completes address)
+			try {
+				credentialRepository.save(credential);
+			} catch (DuplicateKeyException ex) {
+				// Race condition: another Google sign-in created the account first
+				throw new ApiException(ErrorCode.EMAIL_ALREADY_REGISTERED);
+			}
+			
+			// Create minimal customer profile without address (Req 3.2.U3)
+			// If this fails, rollback the credential to maintain consistency
+			try {
+				customerService.createProfile(
+						new CustomerCreateCommand(userId, email, googleUser.name(), null));
+			} catch (Exception ex) {
+				// Rollback: delete the credential we just created
+				try {
+					credentialRepository.delete(credential);
+				} catch (Exception rollbackEx) {
+					log.error("Failed to rollback credential after profile creation failure for email: {}", email, rollbackEx);
+				}
+				
+				log.error("Failed to create customer profile for Google user: {}", email, ex);
+				throw new ApiException(ErrorCode.INTERNAL_ERROR);
+			}
+		}
+
+		// Check account status after finding/creating
+		if (credential.getAccountStatus() == AccountStatus.DEACTIVATED) {
+			throw new ApiException(ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
+		}
+
+		// Issue JWT token
+		return new AuthTokenDto(
+				tokenProvider.generate(credential),
+				TOKEN_TYPE_BEARER,
+				tokenProvider.getAccessTokenTtlSeconds(),
+				new AuthTokenDto.AuthUserDto(
+						credential.getId(),
+						profileReader.fullNameOf(credential),
+						credential.getEmail(),
+						credential.getAccountRole()),
+				accountCreated,
+				profileCompletionRequired);
+	}
+@Override
+	public void completeProfile(String userId, CompleteProfileCommand command) {
+		// Validate province code exists
+		try {
+			regionResolver.resolve(command.provinceCode());
+		} catch (Exception e) {
+			throw new ApiException(ErrorCode.PROVINCE_CODE_INVALID);
+		}
+
+		// Build address from command
+		Address address = Address.builder()
+				.streetNumber(command.streetNumber().trim())
+				.streetName(command.streetName().trim())
+				.ward(command.ward().trim())
+				.provinceCode(command.provinceCode().trim())
+				.build();
+
+		// Update customer profile with address and get resolved region
+		Region homeRegion = customerService.updateAddress(
+				new UpdateAddressCommand(userId, address));
+
+		// Update credential's homeRegion to match
+		UserCredential credential = credentialRepository.findById(userId)
+				.orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
+		
+		credential.setHomeRegion(homeRegion);
+		credentialRepository.save(credential);
+	}
+
+	
 	/** One field takes both, so the server works out which was typed (see LoginCommand). */
 	private Optional<UserCredential> findCredential(String identifier) {
 		if (identifier == null || identifier.isBlank()) {

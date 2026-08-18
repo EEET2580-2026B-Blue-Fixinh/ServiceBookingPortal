@@ -27,3 +27,21 @@ export function register(payload) {
 export function login(credentials) {
   return apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials, { auth: false })
 }
+
+/**
+ * POST /auth/oauth/google (Section 4.3). Exchanges Google authorization code
+ * for a JWT. Returns `{ accessToken, tokenType, expiresIn, user, accountCreated,
+ * profileCompletionRequired }`.
+ *
+ * @param {{code: string}} payload  Authorization code from Google's OAuth redirect.
+ */
+export function googleLogin(payload) {
+  return apiClient.post(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, payload, { auth: false })
+}
+/**
+ * Complete Google OAuth user profile with address (Req 3.2.U3).
+ * Requires authentication.
+ */
+export function completeProfile(payload) {
+  return apiClient.put(API_ENDPOINTS.AUTH.COMPLETE_PROFILE, payload);
+}

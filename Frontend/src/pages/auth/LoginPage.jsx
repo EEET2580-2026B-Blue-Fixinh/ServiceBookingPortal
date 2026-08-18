@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { DEMO_ACCOUNTS, SHOW_DEMO_ACCOUNT } from '../../config/env'
+import { DEMO_ACCOUNTS, SHOW_DEMO_ACCOUNT, GOOGLE_CLIENT_ID } from '../../config/env'
 import { ROLES, ROUTES, SESSION_EXPIRED_MESSAGE } from '../../config/constants'
 import { AuthLayout } from '../../components/auth/AuthLayout'
 import { AuthIntro } from '../../components/auth/AuthIntro'
 import { GoogleIcon, MaterialIcon } from '../../components/shared/icons'
 import { isValidLoginIdentifier } from '../../utils/validators'
 import { useAuth } from '../../context/AuthContext'
-import { login as requestLogin } from '../../services/api/endpoints/authEndpoints'
+import { login as requestLogin, googleLogin as requestGoogleLogin } from '../../services/api/endpoints/authEndpoints'
 
 // Hidden rather than broken when a developer has not copied .env.example: without
 // an address the buttons would fill blanks and the sign-in would fail confusingly.
@@ -30,6 +30,57 @@ export function LoginPage() {
 
   const { login: startSession } = useAuth()
   const navigate = useNavigate()
+  const oauthProcessed = useRef(false); // Prevent double OAuth processing
+
+  // Handle Google OAuth callback (Req 3.2.U1)
+  useEffect(() => {
+    const handleGoogleCallback = async () => {
+      // Check if this is a Google OAuth redirect with an authorization code
+      const urlParams = new URLSearchParams(window.location.search)
+      const code = urlParams.get('code')
+      const state = urlParams.get('state')
+
+      if (code && state === 'google_oauth' && !oauthProcessed.current) {
+        oauthProcessed.current = true; // Mark as processing immediately
+        
+        // Clean up URL immediately to prevent double submission
+        window.history.replaceState({}, '', window.location.pathname)
+        
+        setSubmitting(true)
+        setFormError('')
+        
+        try {
+          // Exchange authorization code for JWT token
+          const session = await requestGoogleLogin({ code })
+
+          // Start session immediately so user is authenticated
+          startSession(session.accessToken, session.user, session.expiresIn)
+
+          // Check if profile completion is required
+          if (session.profileCompletionRequired) {
+            // New Google user without address - redirect to profile completion
+            // Session is already started, so they're authenticated
+            navigate(ROUTES.PROFILE_COMPLETION, { replace: true })
+            return
+          }
+
+          // Existing user - redirect to dashboard
+          const isAdmin = session.user?.role === ROLES.ADMIN
+          const home = isAdmin ? ROUTES.ADMIN : ROUTES.BOOKING
+          const intended = location.state?.from?.pathname
+          const canReturn = intended && intended.startsWith(ROUTES.ADMIN) === isAdmin
+
+          navigate(canReturn ? intended : home, { replace: true })
+        } catch (error) {
+          setFormError(error.message || 'Google sign-in failed. Please try again.')
+        } finally {
+          setSubmitting(false)
+        }
+      }
+    }
+
+    handleGoogleCallback()
+  }, []) // Empty dependency array - only run once on mount
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -93,11 +144,28 @@ export function LoginPage() {
   }
 
   const handleGoogleLogin = () => {
-    // TODO: wire up Google OAuth once available
+    if (!GOOGLE_CLIENT_ID) {
+      setFormError('Google Sign-In is not configured.')
+      return
+    }
+
+    // Redirect to Google's OAuth 2.0 authorization endpoint (Req 3.2.U1)
+    const redirectUri = `${window.location.origin}/login`
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    
+    authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID)
+    authUrl.searchParams.set('redirect_uri', redirectUri)
+    authUrl.searchParams.set('response_type', 'code')
+    authUrl.searchParams.set('scope', 'email profile')
+    authUrl.searchParams.set('state', 'google_oauth')  // CSRF protection
+    authUrl.searchParams.set('access_type', 'offline')
+    authUrl.searchParams.set('prompt', 'select_account')
+
+    window.location.href = authUrl.toString()
   }
 
   const handleForgotPassword = () => {
-    // TODO: wire up forgot-password flow once available
+    // Password reset flow will be implemented in a future task
   }
 
   return (

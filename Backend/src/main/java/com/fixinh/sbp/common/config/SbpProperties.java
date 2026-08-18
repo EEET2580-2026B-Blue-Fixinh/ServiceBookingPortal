@@ -23,6 +23,7 @@ public class SbpProperties {
 	private Jwt jwt = new Jwt();
 	private Mongo mongo = new Mongo();
 	private Cors cors = new Cors();
+	private OAuth oauth = new OAuth();
 
 	/** Req 3.2.M1-M3: access tokens issued on sign-in and validated on every protected call. */
 	@Getter
@@ -68,5 +69,20 @@ public class SbpProperties {
 	@Setter
 	public static class Cors {
 		private List<String> allowedOrigins = new ArrayList<>();
+	}
+
+	/** Req 3.2.U1-U3: Google OAuth 2.0 configuration. */
+	@Getter
+	@Setter
+	public static class OAuth {
+		private Google google = new Google();
+
+		@Getter
+		@Setter
+		public static class Google {
+			private String clientId;
+			private String clientSecret;
+			private String redirectUri;
+		}
 	}
 }

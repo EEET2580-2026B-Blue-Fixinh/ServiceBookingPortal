@@ -5,6 +5,11 @@
 // Override via VITE_API_URL once the team's self-signed cert is in place.
 export const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8443/api/v1'
 
+// Google OAuth 2.0 configuration (Req 3.2.U1). Client ID comes from Google
+// Cloud Console; redirect URI is where Google sends the user after consent.
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+export const GOOGLE_REDIRECT_URI = 'http://localhost:3000'
+
 // Manual on/off switch for the demo-account shortcut on the login page.
 // Flip VITE_SHOW_DEMO_ACCOUNT in .env (or .env.local for a personal-only
 // override) — set it to "false" before shipping to production.

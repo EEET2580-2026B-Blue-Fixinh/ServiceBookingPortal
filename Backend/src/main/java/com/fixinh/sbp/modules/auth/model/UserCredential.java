@@ -1,8 +1,8 @@
 package com.fixinh.sbp.modules.auth.model;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -56,7 +56,8 @@ public class UserCredential {
 	@Indexed(unique = true)
 	private String email;
 
-	@Indexed(unique = true)
+	// sparse=true allows multiple null values (Google OAuth users have no phone number)
+	@Indexed(unique = true, sparse = true)
 	private String phoneNumber;
 
 	/**
@@ -73,7 +74,7 @@ public class UserCredential {
 
 	/** How this account can sign in — PASSWORD, GOOGLE, or both (Appendix A). */
 	@Builder.Default
-	private List<String> authProviders = new ArrayList<>();
+	private Set<AuthProvider> authProviders = new HashSet<>();
 
 	private Instant registeredAt;
 

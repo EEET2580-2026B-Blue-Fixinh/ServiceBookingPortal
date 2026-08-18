@@ -46,7 +46,7 @@ public class SecurityConfig {
 				.exceptionHandling(handling -> handling.authenticationEntryPoint(authenticationEntryPoint))
 				.authorizeHttpRequests(auth -> auth
 						// Public: a user must reach registration and sign-in before holding a token.
-						.requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+						.requestMatchers("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/oauth/google").permitAll()
 						// The address dropdown is needed to fill in the registration form, so it
 						// cannot require the token registration has not issued yet (Req 3.1.S4).
 						.requestMatchers("/api/v1/reference/provinces").permitAll()

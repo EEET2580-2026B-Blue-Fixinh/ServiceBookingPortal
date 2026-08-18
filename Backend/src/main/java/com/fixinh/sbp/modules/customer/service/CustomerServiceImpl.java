@@ -8,8 +8,10 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.fixinh.sbp.common.security.Role;
+import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
@@ -42,7 +44,10 @@ public class CustomerServiceImpl implements CustomerInternalService {
 				// Truncated to the precision BSON can hold, so the value returned by register is
 				// the same value every later read reports.
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
-				.homeRegion(regionResolver.resolve(command.address().getProvinceCode()))
+				// Google OAuth users start in south region until they complete profile (Req 3.2.U3)
+				.homeRegion(command.address() != null 
+						? regionResolver.resolve(command.address().getProvinceCode()) 
+						: Region.SOUTH)
 				.build();
 
 		return customerRepository.save(customer);
@@ -51,6 +56,24 @@ public class CustomerServiceImpl implements CustomerInternalService {
 	@Override
 	public Optional<Customer> findById(String id) {
 		return customerRepository.findById(id);
+	}
+
+	@Override
+	public Region updateAddress(UpdateAddressCommand command) {
+		// Find the customer profile
+		Customer customer = customerRepository.findById(command.customerId())
+				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + command.customerId()));
+
+		// Resolve the home region from the new address
+		Region homeRegion = regionResolver.resolve(command.address().getProvinceCode());
+
+		// Update the customer profile with the new address and region
+		customer.setAddress(command.address());
+		customer.setHomeRegion(homeRegion);
+		customerRepository.save(customer);
+
+		// Return the region so the caller can update the credential
+		return homeRegion;
 	}
 
 	/** Stored lower-cased so the denormalised copy matches the credential it was taken from. */

@@ -1,0 +1,19 @@
+#!/bin/bash
+# Template for Google OAuth 2.0 credentials setup
+# 
+# Copy this file to set-google-oauth.sh and fill in your credentials:
+#   cp set-google-oauth.sh.example set-google-oauth.sh
+#
+# Get credentials from: https://console.cloud.google.com/apis/credentials
+# Then run: source ./set-google-oauth.sh
+
+export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_CLIENT_SECRET="your-client-secret"
+export GOOGLE_REDIRECT_URI="http://localhost:3000/login"
+
+echo "✅ Google OAuth credentials set!"
+echo "   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:0:20}..."
+echo "   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:0:10}***"
+echo "   GOOGLE_REDIRECT_URI: $GOOGLE_REDIRECT_URI"
+echo ""
+echo "Now run: ./mvnw spring-boot:run"

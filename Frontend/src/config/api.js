@@ -23,6 +23,8 @@ export const API_ENDPOINTS = {
   AUTH: {
     REGISTER: '/auth/register',
     LOGIN: '/auth/login',
+    GOOGLE_LOGIN: '/auth/oauth/google',  // Section 4.3: Google OAuth sign-in
+    COMPLETE_PROFILE: '/auth/profile/complete',  // Req 3.2.U3: Profile completion
   },
 
   // Dropdown data, cacheable for the length of a session. Also public: the

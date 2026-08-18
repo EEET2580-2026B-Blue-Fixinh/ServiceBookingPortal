@@ -35,6 +35,8 @@ public enum ErrorCode {
 			"The access token has expired. Please sign in again."),
 	AUTH_ACCOUNT_DEACTIVATED(HttpStatus.FORBIDDEN,
 			"This account has been deactivated."),
+	GOOGLE_OAUTH_FAILED(HttpStatus.UNAUTHORIZED,
+			"Google sign-in failed. The authorization code is invalid or has expired."),
 
 	// --- Top-level: validation and conflicts ---
 	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "One or more fields are invalid."),

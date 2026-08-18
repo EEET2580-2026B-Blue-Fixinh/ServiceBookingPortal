@@ -3,6 +3,7 @@ package com.fixinh.sbp.modules.customer.interfaces.internal;
 import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
@@ -24,4 +25,14 @@ public interface CustomerInternalService {
 
 	/** The profile behind a token's {@code sub}, or empty if this id is not a customer's. */
 	Optional<Customer> findById(String id);
+
+	/**
+	 * Updates a customer's address (Req 3.2.U3: Google OAuth profile completion).
+	 *
+	 * <p>Sets the customer's address and resolves their home region. Returns the resolved
+	 * region so the caller can update the credential's homeRegion accordingly.
+	 *
+	 * @return The home region determined by the address province
+	 */
+	com.fixinh.sbp.common.sharding.Region updateAddress(UpdateAddressCommand command);
 }

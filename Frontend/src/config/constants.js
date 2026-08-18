@@ -19,6 +19,7 @@ export const ROUTES = {
   REGISTER: '/register',
   BOOKING: '/booking',
   ADMIN: '/admin',
+  PROFILE_COMPLETION: '/profile/complete',  // Google OAuth new users (Req 3.2.U3)
 }
 
 /**

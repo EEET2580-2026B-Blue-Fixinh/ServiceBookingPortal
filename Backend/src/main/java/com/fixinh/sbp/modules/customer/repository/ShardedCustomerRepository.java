@@ -42,10 +42,16 @@ public class ShardedCustomerRepository implements CustomerRepository {
 
 	@Override
 	public Customer save(Customer customer) {
-		Region home = customer.getHomeRegion() != null
-				? customer.getHomeRegion()
-				: regionResolver.resolve(customer.getAddress().getProvinceCode());
-		customer.setHomeRegion(home);
+		// homeRegion is always set by CustomerServiceImpl.createProfile(),
+		// either from address resolution or defaulting to SOUTH for Google OAuth users
+		Region home = customer.getHomeRegion();
+		if (home == null) {
+			// Defensive fallback - should never happen with current code
+			home = customer.getAddress() != null
+					? regionResolver.resolve(customer.getAddress().getProvinceCode())
+					: Region.SOUTH;
+			customer.setHomeRegion(home);
+		}
 
 		return templateFor(home).save(customer);
 	}
