@@ -5,7 +5,8 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   data:
     mongodb:
-      auto-index-creation: true
+      auto-index-creation: false
+    
 
 server:
   port: ${SERVER_PORT:8443}
@@ -24,16 +25,19 @@ fixinh:
     jwt:
       # Req 3.2.M1-M3: JWT issuance/validation for protected resources.
       secret: ${JWT_SECRET:dev-only-change-me-please-32-bytes-minimum-secret}
-      issuer: fixinh-sbp
-      access-token-ttl-minutes: 60
+      issuer: ${JWT_ISSUER:fixinh-sbp}
+      # Shorten this to test the client's forced sign-out without waiting an hour:
+      # JWT_ACCESS_TOKEN_TTL_MINUTES=1. Also what /auth/login reports as expiresIn.
+      access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:60}
 
     mongo:
       # Req 3.1.U1/U2, 4.U1: Customer data is horizontally sharded by region.
       # Boundary: Hue and south -> south shard; Quang Tri and north -> north shard.
       south:
-        uri: ${MONGO_URI_SOUTH:mongodb://localhost:27017/sbp_south}
+        uri: ${MONGO_URI_SOUTH}
       north:
-        uri: ${MONGO_URI_NORTH:mongodb://localhost:27017/sbp_north}
+        uri: ${MONGO_URI_NORTH}
+      server-selection-timeout-seconds: ${MONGO_SERVER_SELECTION_TIMEOUT_SECONDS:30}
 
     smp:
       # Req 4.S2/4.M1/4.M3: Booking/Technician/Staff data is normally owned by
@@ -66,3 +70,10 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    mongodb:
+      enabled: false
+      

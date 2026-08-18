@@ -43,6 +43,19 @@ public class SbpProperties {
 		private Shard south = new Shard();
 		private Shard north = new Shard();
 
+		/**
+		 * Connections held open per shard. The driver defaults to 100, but a free Atlas cluster
+		 * admits 500 in total — five developers running the app at once would sit exactly on the
+		 * ceiling before Compass or a test run is counted.
+		 */
+		private int maxPoolSize = 20;
+
+		/**
+		 * How long to wait for a reachable server before failing. The driver defaults to 30
+		 * seconds, which makes a missing IP-allowlist entry look like a hang rather than an error.
+		 */
+		private int serverSelectionTimeoutSeconds = 5;
+
 		@Getter
 		@Setter
 		public static class Shard {
