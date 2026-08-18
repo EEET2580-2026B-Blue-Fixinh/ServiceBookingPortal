@@ -5,23 +5,19 @@ import java.util.Optional;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
- * Customer data access spanning both regional stores (Req 3.1.U2).
+ * Customer profile access, spanning both regional stores (Req 3.1.U2).
  *
  * <p>Deliberately a plain interface rather than a Spring Data {@code MongoRepository}: derived
- * queries bind to a single {@code MongoTemplate}, and every method here has to reach two.
+ * queries bind to a single {@code MongoTemplate}, and these methods have to reach two.
  *
- * <p>Uniqueness and lookups are system-wide. Callers never name a shard.
+ * <p>No lookup by email or phone here any more — sign-in resolves those against the credential
+ * store, which is in both databases and so answers in one read. Callers never name a shard.
  */
 public interface CustomerRepository {
 
 	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
 
-	Optional<Customer> findByEmail(String email);
-
-	Optional<Customer> findByPhoneNumber(String phoneNumber);
-
-	boolean existsByEmail(String email);
-
-	boolean existsByPhoneNumber(String phoneNumber);
+	/** The profile for a signed-in caller, whose id came from their token. */
+	Optional<Customer> findById(String id);
 }

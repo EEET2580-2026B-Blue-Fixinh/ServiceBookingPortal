@@ -1,6 +1,6 @@
 package com.fixinh.sbp.modules.auth.dto.external;
 
-import com.fixinh.sbp.modules.customer.model.Role;
+import com.fixinh.sbp.common.security.Role;
 
 /**
  * What a successful sign-in returns (API Documentation Section 4.2).
