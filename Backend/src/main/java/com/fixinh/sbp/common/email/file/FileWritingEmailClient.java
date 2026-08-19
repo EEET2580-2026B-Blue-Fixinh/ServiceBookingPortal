@@ -63,7 +63,7 @@ public class FileWritingEmailClient implements EmailClient {
 	 */
 	@PostConstruct
 	void announceMode() {
-		log.info("Email delivery: FILE mode. Nothing is sent — messages are written to {}",
+		log.info("Email delivery: FILE mode. Nothing is sent - messages are written to {}",
 				Path.of(properties.getOutboxDirectory()).toAbsolutePath());
 	}
 
