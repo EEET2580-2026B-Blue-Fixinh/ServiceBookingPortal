@@ -18,6 +18,10 @@ public interface CustomerRepository {
 	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
 
-	/** The profile for a signed-in caller, whose id came from their token. */
+	/**
+	 * The profile for a signed-in caller, whose id came from their token. Also what the booking
+	 * module resolves a customer's home region through (see
+	 * {@code CustomerServiceImpl.findHomeRegion}), since a Mongo id carries no region either.
+	 */
 	Optional<Customer> findById(String id);
 }

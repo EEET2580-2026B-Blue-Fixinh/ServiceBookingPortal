@@ -50,6 +50,20 @@ public enum ErrorCode {
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,
 			"Something went wrong on our side. Quote the traceId when reporting it."),
 
+	// --- Top-level: booking (API Documentation §7.1, Req 3.3.S1–S3) ---
+	SERVICE_NOT_FOUND(HttpStatus.NOT_FOUND,
+			"The requested repair service is unknown or no longer active."),
+	PREFERRED_DATE_IN_PAST(HttpStatus.UNPROCESSABLE_CONTENT,
+			"The preferred service date has already passed."),
+	TIME_WINDOW_INVALID(HttpStatus.UNPROCESSABLE_CONTENT,
+			"The end time must be after the start time, with at least 60 minutes between them."),
+	/**
+	 * Defined so the catalogue matches the API doc, but the mock SMP client never fails —
+	 * genuinely reachable only once a live client can time out or refuse (§2.8).
+	 */
+	SMP_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+			"The booking service is temporarily unavailable. Please try again."),
+
 	// --- Field-level: password (Req 3.1.M1) ---
 	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,
 			"Password must be at least 8 characters.", "Fixinh@2026"),

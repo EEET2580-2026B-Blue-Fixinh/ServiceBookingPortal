@@ -8,8 +8,10 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.fixinh.sbp.common.security.Role;
+import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
@@ -26,7 +28,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class CustomerServiceImpl implements CustomerInternalService {
+public class CustomerServiceImpl implements CustomerInternalService, CustomerExternalService {
 
 	private final CustomerRepository customerRepository;
 	private final RegionResolver regionResolver;
@@ -51,6 +53,12 @@ public class CustomerServiceImpl implements CustomerInternalService {
 	@Override
 	public Optional<Customer> findById(String id) {
 		return customerRepository.findById(id);
+	}
+
+	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */
+	@Override
+	public Optional<Region> findHomeRegion(String customerId) {
+		return customerRepository.findById(customerId).map(Customer::getHomeRegion);
 	}
 
 	/** Stored lower-cased so the denormalised copy matches the credential it was taken from. */
