@@ -5,6 +5,12 @@ fixinh:
   sbp:
     smp:
       mode: mock
+    email:
+      # Stated explicitly rather than inherited. The acceptance criterion for
+      # Req 3.1.S5 is that the dev profile sends nothing externally, and a rule
+      # that important should be visible in the profile it applies to instead of
+      # depending on a default two files away staying what it is.
+      mode: file
 
 server:
   ssl:
