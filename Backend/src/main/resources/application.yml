@@ -77,6 +77,24 @@ fixinh:
       # exactly as smp.base-url above is a placeholder.
       staff-sign-in-url: ${EMAIL_STAFF_SIGN_IN_URL:http://localhost:8081/login}
 
+      retry:
+        # a welcome email the provider refused is retried in the background.
+        # This is what makes §10.6's 502 honest -- the request fails, the account stands,
+        # and the message is still owed.
+        #
+        # enabled and sweep-interval are read by @ConditionalOnProperty and @Scheduled,
+        # which resolve placeholders before binding and so cannot see SbpProperties. The
+        # three below are bound normally. Durations are ISO-8601 (PT1M, PT30S, PT2M).
+        enabled: ${EMAIL_RETRY_ENABLED:true}
+        sweep-interval: ${EMAIL_RETRY_SWEEP_INTERVAL:PT1M}
+        initial-delay: ${EMAIL_RETRY_INITIAL_DELAY:PT30S}
+        # Attempts in total, the first included. On the last failure the notification is
+        # marked ABANDONED rather than retried forever.
+        max-attempts: ${EMAIL_RETRY_MAX_ATTEMPTS:5}
+        # Doubles each time: with 2 minutes, attempts land at about 0, 2, 6, 14 and 30.
+        base-delay: ${EMAIL_RETRY_BASE_DELAY:PT2M}
+        batch-size: ${EMAIL_RETRY_BATCH_SIZE:50}
+
     cloudinary:
       # Req 3.3.M1, 3.4.M1: images are relayed through the backend, never
       # uploaded directly from the browser to Cloudinary.

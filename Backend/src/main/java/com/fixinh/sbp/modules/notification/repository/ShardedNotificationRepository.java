@@ -1,8 +1,11 @@
 package com.fixinh.sbp.modules.notification.repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -10,6 +13,8 @@ import org.springframework.stereotype.Repository;
 
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.ShardMongoConfig;
+import com.fixinh.sbp.modules.notification.model.DeliveryChannel;
+import com.fixinh.sbp.modules.notification.model.DeliveryStatus;
 import com.fixinh.sbp.modules.notification.model.Notification;
 
 /**
@@ -55,6 +60,24 @@ public class ShardedNotificationRepository implements NotificationRepository {
 			found = north.findOne(query, Notification.class);
 		}
 		return Optional.ofNullable(found);
+	}
+
+		@Override
+	public List<Notification> findOutstandingEmails(int limit) {
+		// Field order matches the {deliveryStatus, lastAttemptAt} index from patch 3, so this
+		// reads an index range rather than scanning every notification ever sent.
+		Query query = Query.query(
+						Criteria.where("deliveryStatus")
+								.in(DeliveryStatus.PENDING, DeliveryStatus.FAILED)
+								.and("deliveryChannel").is(DeliveryChannel.EMAIL))
+				.with(Sort.by(Sort.Direction.ASC, "lastAttemptAt"))
+				.limit(limit);
+
+		// Both stores, because a notification lives in exactly one of them and the sweeper has
+		// no recipient in hand to work out which.
+		List<Notification> outstanding = new ArrayList<>(south.find(query, Notification.class));
+		outstanding.addAll(north.find(query, Notification.class));
+		return outstanding;
 	}
 
 	private MongoTemplate templateFor(Region region) {

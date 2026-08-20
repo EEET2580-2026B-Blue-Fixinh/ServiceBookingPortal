@@ -1,7 +1,7 @@
 package com.fixinh.sbp.modules.notification.service;
 
 import org.springframework.stereotype.Component;
-
+import com.fixinh.sbp.modules.notification.model.NotificationType;
 import com.fixinh.sbp.common.config.SbpProperties;
 import com.fixinh.sbp.common.email.EmailMessage;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
@@ -35,6 +35,25 @@ public class StaffWelcomeEmailComposer {
 	public String summaryFor(StaffWelcomeEmailCommand command) {
 		return "Welcome email for %s (%s) to %s"
 				.formatted(command.fullName(), command.role(), command.email());
+	}
+
+	/**
+	 * The subject a given kind of email carries.
+	 *
+	 * <p>Exists so the retry sweeper can rebuild a message from a stored body without the
+	 * subject having to be stored beside it. A subject is a property of the kind of email, not
+	 * of one instance of it, so deriving beats persisting.
+	 *
+	 * @throws IllegalArgumentException for a type that is never emailed. The sweeper filters to
+	 *         the {@code EMAIL} channel, so reaching this means something upstream is wrong and
+	 *         should say so rather than invent a subject line.
+	 */
+	public String subjectFor(NotificationType type) {
+		return switch (type) {
+			case STAFF_ACCOUNT_CREATED -> SUBJECT;
+			case BOOKING_CONFIRMED, BOOKING_SCHEDULED -> throw new IllegalArgumentException(
+					type + " is an in-app notification and is never sent by email.");
+		};
 	}
 
 	private String body(StaffWelcomeEmailCommand command) {

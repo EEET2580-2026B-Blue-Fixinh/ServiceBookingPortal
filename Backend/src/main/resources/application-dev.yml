@@ -19,3 +19,5 @@ server:
 logging:
   level:
     com.fixinh.sbp: DEBUG
+    org.mongodb.driver.client: WARN
+    org.mongodb.driver.cluster: WARN
