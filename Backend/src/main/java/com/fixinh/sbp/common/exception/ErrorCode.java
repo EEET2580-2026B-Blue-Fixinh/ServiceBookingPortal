@@ -64,6 +64,10 @@ public enum ErrorCode {
 	SMP_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
 			"The booking service is temporarily unavailable. Please try again."),
 
+	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
+			"The staff account was created, but the welcome email could not be sent. "
+					+ "It will be retried automatically."),
+
 	// --- Field-level: password (Req 3.1.M1) ---
 	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,
 			"Password must be at least 8 characters.", "Fixinh@2026"),

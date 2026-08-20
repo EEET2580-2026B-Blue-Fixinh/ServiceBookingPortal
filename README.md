@@ -91,7 +91,29 @@ no secret is committed.
 | `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | localhost | The two regional Atlas clusters |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
 | `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards |
+| `EMAIL_MODE` | `file` | `file` = write to disk, send nothing; `smtp` = send for real. Inert on `dev`, which pins the mode — see below |
+| `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | `no-reply@fixinh.vn` / `Fixinh` | Envelope sender of the staff welcome email |
+| `EMAIL_OUTBOX_DIR` | `target/mail` | Where `file` mode writes. Git-ignored; `mvn clean` clears it |
+| `EMAIL_STAFF_SIGN_IN_URL` | placeholder | SMP's sign-in page — staff cannot sign in to SBP |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | none | `integration` profile only. No defaults: a missing one fails startup by name |
 | `CLOUDINARY_*`, `GOOGLE_*` | empty | Not yet used |
+
+**Email.** `dev` is pinned to `file` mode, so no message can leave the machine during
+development (Req 3.1.S5's acceptance criterion).
+
+Because `application-dev.yml` sets the mode literally, `EMAIL_MODE` cannot lift the pin — a
+profile file outranks the placeholder in `application.yml`. An OS environment variable named
+for the property itself does outrank both, so that is the escape hatch for the one real send
+needed to verify a provider end to end:
+
+```powershell
+$env:SPRING_MAIL_HOST="sandbox.smtp.mailtrap.io"; $env:SPRING_MAIL_PORT="2525"
+$env:SPRING_MAIL_USERNAME="..."; $env:SPRING_MAIL_PASSWORD="..."
+$env:FIXINH_SBP_EMAIL_MODE="smtp"; .\mvnw.cmd spring-boot:run
+```
+
+Use a sandbox provider that captures mail rather than delivering it. No credential belongs in
+`application.yml`, and none is committed.
 
 Frontend config lives in [env.js](Frontend/src/config/env.js), read from `.env` — API base URL
 and the login page's demo-account shortcut (`VITE_SHOW_DEMO_ACCOUNT`).

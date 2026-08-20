@@ -2,6 +2,8 @@ package com.fixinh.sbp.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
+import java.util.ArrayList;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -10,10 +12,6 @@ import lombok.Setter;
 
 /**
  * Typed binding for everything under {@code fixinh.sbp} in application.yml.
- *
- * <p>Only the sections the auth slice needs are bound today ({@code jwt}, {@code mongo},
- * {@code cors}). The remaining keys in application.yml ({@code smp}, {@code cloudinary},
- * {@code google-oauth}) stay unbound until the tasks that own them land.
  */
 @ConfigurationProperties(prefix = "fixinh.sbp")
 @Getter
@@ -23,6 +21,7 @@ public class SbpProperties {
 	private Jwt jwt = new Jwt();
 	private Mongo mongo = new Mongo();
 	private Cors cors = new Cors();
+	private Email email = new Email();
 
 	/** Req 3.2.M1-M3: access tokens issued on sign-in and validated on every protected call. */
 	@Getter
@@ -68,5 +67,85 @@ public class SbpProperties {
 	@Setter
 	public static class Cors {
 		private List<String> allowedOrigins = new ArrayList<>();
+	}
+
+	/**
+	 * Req 3.1.S5, API Doc §10.6: the welcome email a new staff member receives.
+	 *
+	 * <p><b>Policy only.</b> The SMTP transport — host, port, credential, TLS — is Spring
+	 * Boot's own {@code spring.mail.*} namespace and is set by the {@code integration}
+	 * profile alone. Splitting the two keeps the provider credential out of the file
+	 * everyone reads, and leaves Boot's autoconfiguration owning what it already owns.
+	 */
+	@Getter
+	@Setter
+	public static class Email {
+
+		/**
+		 * Which {@code EmailClient} is active. Defaults to {@link Mode#FILE} so a missing or
+		 * half-finished configuration cannot reach a real inbox — sending is opted into,
+		 * never fallen into.
+		 */
+		private Mode mode = Mode.FILE;
+
+		/** Envelope sender. Must be an address the provider has authorised, or mail is dropped. */
+		private String fromAddress;
+
+		/** Display name shown beside {@link #fromAddress}. */
+		private String fromName;
+
+		/**
+		 * Where {@link Mode#FILE} writes each message. Under {@code target/} deliberately:
+		 * {@code .gitignore} already covers it, and {@code mvn clean} removes messages that
+		 * carry an initial password rather than leaving them in the working tree.
+		 */
+		private String outboxDirectory = "target/mail";
+
+		/**
+		 * The sign-in link printed in the welcome email.
+		 */
+		private String staffSignInUrl;
+
+		/** Background redelivery of emails a provider refused (Req 3.1.S5). */
+		private Retry retry = new Retry();
+
+		/**
+		 * What the retry sweeper is allowed to do.
+		 *
+		 * <p>Two neighbouring keys are read by annotations rather than bound here, because
+		 * {@code @Scheduled} and {@code @ConditionalOnProperty} resolve placeholders before any
+		 * binding happens and cannot see this object: {@code retry.enabled} and
+		 * {@code retry.sweep-interval}. They are documented in application.yml beside these.
+		 */
+		@Getter
+		@Setter
+		public static class Retry {
+
+			/**
+			 * Attempts in total, the first one included. On the last failure the notification is
+			 * marked {@code ABANDONED} rather than retried forever — a message nobody will ever
+			 * receive should be a visible dead end, not a job that runs until the heat death of
+			 * the cluster.
+			 */
+			private int maxAttempts = 5;
+
+			/**
+			 * The first wait after a failure. Each subsequent wait doubles, so the default gives
+			 * attempts at roughly 0, 2, 6, 14 and 30 minutes — long enough to ride out a provider
+			 * blip without hammering one that is genuinely down.
+			 */
+			private Duration baseDelay = Duration.ofMinutes(2);
+
+			/** How many outstanding notifications one sweep will look at, per store. */
+			private int batchSize = 50;
+		}
+
+		/** How the message leaves the application. */
+		public enum Mode {
+			/** Written to {@link Email#outboxDirectory}. Nothing leaves the machine. */
+			FILE,
+			/** Sent through the provider configured under {@code spring.mail.*}. */
+			SMTP
+		}
 	}
 }

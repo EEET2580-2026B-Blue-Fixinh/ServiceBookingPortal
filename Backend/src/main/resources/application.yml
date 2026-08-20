@@ -53,6 +53,48 @@ fixinh:
       # vite.config.js — it is the only origin this policy admits.
       allowed-origins: ${CORS_ALLOWED_ORIGINS:https://localhost:3000,http://localhost:3000}
 
+    email:
+      # Req 3.1.S5, API Doc §10.6: the welcome email sent when an administrator
+      # creates a receptionist or technician.
+      #
+      # This block is policy. The SMTP transport lives under spring.mail.* and is
+      # set only by application-integration.yml -- there is deliberately no
+      # spring.mail.host here, because a default of localhost would let a
+      # misconfigured environment appear to send while dropping every message.
+      #
+      # mode: file -> EmailClient writes the message to outbox-directory and
+      #               nothing leaves the machine. The default everywhere, so
+      #               sending is opted into rather than fallen into.
+      #       smtp -> EmailClient sends through spring.mail.*.
+      mode: ${EMAIL_MODE:file}
+      from-address: ${EMAIL_FROM_ADDRESS:no-reply@fixinh.vn}
+      from-name: ${EMAIL_FROM_NAME:Fixinh}
+      # Under target/ on purpose: .gitignore already covers it, and mvn clean
+      # discards messages containing an initial password.
+      outbox-directory: ${EMAIL_OUTBOX_DIR:target/mail}
+      # NOTE: this is SMP's sign-in page, not SBP's. Staff accounts live in SMP
+      # and cannot sign in to SBP. Placeholder until SMT publishes the real URL,
+      # exactly as smp.base-url above is a placeholder.
+      staff-sign-in-url: ${EMAIL_STAFF_SIGN_IN_URL:http://localhost:8081/login}
+
+      retry:
+        # a welcome email the provider refused is retried in the background.
+        # This is what makes §10.6's 502 honest -- the request fails, the account stands,
+        # and the message is still owed.
+        #
+        # enabled and sweep-interval are read by @ConditionalOnProperty and @Scheduled,
+        # which resolve placeholders before binding and so cannot see SbpProperties. The
+        # three below are bound normally. Durations are ISO-8601 (PT1M, PT30S, PT2M).
+        enabled: ${EMAIL_RETRY_ENABLED:true}
+        sweep-interval: ${EMAIL_RETRY_SWEEP_INTERVAL:PT1M}
+        initial-delay: ${EMAIL_RETRY_INITIAL_DELAY:PT30S}
+        # Attempts in total, the first included. On the last failure the notification is
+        # marked ABANDONED rather than retried forever.
+        max-attempts: ${EMAIL_RETRY_MAX_ATTEMPTS:5}
+        # Doubles each time: with 2 minutes, attempts land at about 0, 2, 6, 14 and 30.
+        base-delay: ${EMAIL_RETRY_BASE_DELAY:PT2M}
+        batch-size: ${EMAIL_RETRY_BATCH_SIZE:50}
+
     cloudinary:
       # Req 3.3.M1, 3.4.M1: images are relayed through the backend, never
       # uploaded directly from the browser to Cloudinary.
