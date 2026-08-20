@@ -23,6 +23,7 @@ import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
+import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
@@ -35,7 +36,7 @@ import lombok.RequiredArgsConstructor;
 /** Registration and sign-in (API Documentation Sections 4.1 and 4.2). */
 @Service
 @RequiredArgsConstructor
-public class AuthServiceImpl implements AuthExternalService {
+public class AuthServiceImpl implements AuthExternalService, AuthInternalService {
 
 	private static final String TOKEN_TYPE_BEARER = "Bearer";
 	private static final String PROVIDER_PASSWORD = "PASSWORD";
@@ -149,6 +150,21 @@ public class AuthServiceImpl implements AuthExternalService {
 						profileReader.fullNameOf(credential),
 						credential.getEmail(),
 						credential.getAccountRole()));
+	}
+
+	@Override
+	public List<UserCredential> listByRole(Role role) {
+		return credentialRepository.findByAccountRole(role);
+	}
+
+	@Override
+	public UserCredential setAccountStatus(String id, AccountStatus status) {
+		UserCredential credential = credentialRepository.findById(id)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+		credential.setAccountStatus(status);
+
+		return credentialRepository.save(credential);
 	}
 
 	/** One field takes both, so the server works out which was typed (see LoginCommand). */

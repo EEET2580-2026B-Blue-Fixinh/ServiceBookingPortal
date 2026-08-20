@@ -1,9 +1,8 @@
 package com.fixinh.sbp.common.config;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -21,6 +20,7 @@ public class SbpProperties {
 	private Jwt jwt = new Jwt();
 	private Mongo mongo = new Mongo();
 	private Cors cors = new Cors();
+	private Smp smp = new Smp();
 	private Email email = new Email();
 
 	/** Req 3.2.M1-M3: access tokens issued on sign-in and validated on every protected call. */
@@ -67,6 +67,19 @@ public class SbpProperties {
 	@Setter
 	public static class Cors {
 		private List<String> allowedOrigins = new ArrayList<>();
+	}
+
+	/**
+	 * Req 4.S2/4.M1/4.M3: Booking/Technician/Staff data is normally owned by SMP. {@code mode}
+	 * switches which {@code Smp*Client} beans are wired: "mock" serves local fixtures so SBP
+	 * runs standalone, "live" calls the real SMP API once it exists.
+	 */
+	@Getter
+	@Setter
+	public static class Smp {
+		private String mode = "mock";
+		private String baseUrl;
+		private String webhookSharedSecret;
 	}
 
 	/**

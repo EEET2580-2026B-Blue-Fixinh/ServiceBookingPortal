@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.customer.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -24,4 +25,7 @@ public interface CustomerRepository {
 	 * {@code CustomerServiceImpl.findHomeRegion}), since a Mongo id carries no region either.
 	 */
 	Optional<Customer> findById(String id);
+
+	/** Every customer profile system-wide, for the admin customer list (Req 3.5.S2). */
+	List<Customer> findAll();
 }

@@ -5,6 +5,8 @@ import { RegisterPage } from '../auth/RegisterPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
 import { MyBookingsPage } from '../booking/MyBookingsPage'
+import { AdminCustomersPage } from '../admin/AdminCustomersPage'
+import { AdminStaffPage } from '../admin/AdminStaffPage'
 import { AdminHomePage } from '../admin/AdminHomePage'
 
 export function AppRoutes() {
@@ -26,6 +28,8 @@ export function AppRoutes() {
           not an addition to it. */}
       <Route element={<AdminRoute />}>
         <Route path={ROUTES.ADMIN} element={<AdminHomePage />} />
+        <Route path="/admin/customers" element={<AdminCustomersPage />} />
+        <Route path="/admin/staff" element={<AdminStaffPage />} />
       </Route>
     </Routes>
   )

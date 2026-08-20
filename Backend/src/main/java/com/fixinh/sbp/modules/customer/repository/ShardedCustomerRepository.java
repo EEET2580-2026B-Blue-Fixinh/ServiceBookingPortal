@@ -1,5 +1,7 @@
 package com.fixinh.sbp.modules.customer.repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -63,6 +65,15 @@ public class ShardedCustomerRepository implements CustomerRepository {
 			found = north.findOne(query, Customer.class);
 		}
 		return Optional.ofNullable(found);
+	}
+
+	/** Every profile system-wide — each store holds only its own region's customers. */
+	@Override
+	public List<Customer> findAll() {
+		List<Customer> all = new ArrayList<>();
+		all.addAll(south.findAll(Customer.class));
+		all.addAll(north.findAll(Customer.class));
+		return all;
 	}
 
 	private MongoTemplate templateFor(Region region) {

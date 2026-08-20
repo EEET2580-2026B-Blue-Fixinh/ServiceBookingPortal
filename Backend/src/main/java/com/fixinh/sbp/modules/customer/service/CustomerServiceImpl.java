@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.customer.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -19,8 +20,9 @@ import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The customer module's own logic. Only what registration and sign-in need is implemented here;
- * profile read/update (GET and PUT /customers/me) belong to a separate task.
+ * The customer module's own logic. Only what registration, sign-in, and the admin customer
+ * screen need is implemented here; profile read/update (GET and PUT /customers/me) belong to a
+ * separate task.
  *
  * <p>Note what is no longer here: password hashing, and the email and phone uniqueness checks.
  * Both moved to the credential, which is one document in both stores — so uniqueness is enforced
@@ -59,6 +61,11 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 	@Override
 	public Optional<Region> findHomeRegion(String customerId) {
 		return customerRepository.findById(customerId).map(Customer::getHomeRegion);
+	}
+
+	@Override
+	public List<Customer> listAll() {
+		return customerRepository.findAll();
 	}
 
 	/** Stored lower-cased so the denormalised copy matches the credential it was taken from. */

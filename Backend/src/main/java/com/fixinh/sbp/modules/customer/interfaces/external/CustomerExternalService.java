@@ -1,8 +1,10 @@
 package com.fixinh.sbp.modules.customer.interfaces.external;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fixinh.sbp.common.sharding.Region;
+import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
  * What other modules may ask of the customer module (Req A.2.4, A.3.1) — as opposed to
@@ -18,4 +20,10 @@ public interface CustomerExternalService {
 	 *         not-found error rather than a shard-resolution failure.
 	 */
 	Optional<Region> findHomeRegion(String customerId);
+
+	/** Every customer profile system-wide, for the admin customer list (Req 3.5.S2). */
+	List<Customer> listAll();
+
+	/** A single profile, for the admin module to combine with its credential (Req 3.5.S2). */
+	Optional<Customer> findById(String customerId);
 }
