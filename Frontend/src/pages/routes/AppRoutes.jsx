@@ -6,6 +6,7 @@ import { ProtectedRoute } from './ProtectedRoute'
 import { AdminRoute } from './AdminRoute'
 import { MyBookingsPage } from '../booking/MyBookingsPage'
 import { AdminCustomersPage } from '../admin/AdminCustomersPage'
+import { AdminStaffPage } from '../admin/AdminStaffPage'
 
 export function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export function AppRoutes() {
 
       <Route element={<AdminRoute />}>
         <Route path="/admin/customers" element={<AdminCustomersPage />} />
+        <Route path="/admin/staff" element={<AdminStaffPage />} />
       </Route>
     </Routes>
   )

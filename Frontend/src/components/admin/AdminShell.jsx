@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const NAV_ITEMS = [
   { key: 'customers', label: 'Customers', icon: 'group', to: '/admin/customers' },
-  { key: 'staff', label: 'Staff & technicians', icon: 'engineering' },
+  { key: 'staff', label: 'Staff & technicians', icon: 'engineering', to: '/admin/staff' },
   { key: 'account', label: 'My account', icon: 'account_circle' },
 ]
 
@@ -53,7 +53,7 @@ function NavItem({ item, isActive }) {
   )
 }
 
-export function AdminShell({ activeNav, breadcrumb, title, children }) {
+export function AdminShell({ activeNav, breadcrumb, title, headerActions, children }) {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
 
@@ -65,7 +65,9 @@ export function AdminShell({ activeNav, breadcrumb, title, children }) {
   return (
     <div
       className="fixed inset-0 z-[100] grid grid-cols-[260px_minmax(0,1fr)] bg-bk-bg text-left text-[15px]
-        leading-[1.45] text-bk-text max-[900px]:static max-[900px]:grid-cols-1 max-[900px]:min-h-svh"
+        leading-[1.45] text-bk-text max-[900px]:static max-[900px]:grid-cols-1 max-[900px]:min-h-svh
+        [--auth-border:var(--color-bk-border)] [--auth-muted:var(--color-bk-muted)]
+        [--auth-teal:var(--color-bk-teal)] [--auth-text:var(--color-bk-text)]"
     >
       <aside
         className="flex flex-col gap-0 overflow-y-auto border-r border-bk-border bg-bk-surface p-[22px_18px]
@@ -117,6 +119,7 @@ export function AdminShell({ activeNav, breadcrumb, title, children }) {
             <p className="mb-0.5 text-[12.5px] text-bk-muted">{breadcrumb}</p>
             <h1 className="m-0 text-2xl font-extrabold tracking-[-0.3px] text-bk-text">{title}</h1>
           </div>
+          {headerActions && <div className="flex shrink-0 items-center gap-2.5">{headerActions}</div>}
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(20px,3vw,40px)] pb-10 pt-[clamp(16px,3vw,28px)]">
