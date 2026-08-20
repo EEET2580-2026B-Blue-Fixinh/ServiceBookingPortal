@@ -16,6 +16,7 @@ import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationListDto;
+import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 import com.fixinh.sbp.modules.notification.interfaces.external.NotificationExternalService;
@@ -81,7 +82,51 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 		return new StaffWelcomeEmailResult(recorded.getId(), sent);
 	}
 
-		// --- The recipient's own history (§9.1, §9.2) -----------------------------------------
+		// --- Raising one, for Integration and Admin -------------------------------
+
+	@Override
+	public NotificationDto raise(NotificationCreateCommand command) {
+		Region region = storeFor(command);
+
+		Notification saved = notificationRepository.save(Notification.builder()
+				.recipientType(command.recipientType())
+				.recipientIdentifier(command.recipientIdentifier())
+				.type(command.type())
+				.deliveryChannel(command.deliveryChannel())
+				.message(command.message())
+				.bookingRef(command.bookingRef())
+				.readStatus(false)
+				.createdAt(Instant.now())
+				// An in-app notification is delivered by being written -- there is no provider to
+				// accept it and nothing for the retry sweeper to do, so it is SENT on arrival. An
+				// email one stays PENDING and the sweeper picks it up.
+				.deliveryStatus(deliveryStatusOnArrival(command.deliveryChannel()))
+				.sentAt(command.deliveryChannel() == DeliveryChannel.IN_APP ? Instant.now() : null)
+				.homeRegion(region)
+				.build());
+
+		log.debug("Raised {} notification {} for {} {}", command.type(), saved.getId(),
+				command.recipientType(), command.recipientIdentifier());
+
+		return NotificationDto.from(saved);
+	}
+
+	/**
+	 * Where a newly raised notification is filed.
+	 */
+	private Region storeFor(NotificationCreateCommand command) {
+		return switch (command.recipientType()) {
+			case CUSTOMER -> regionResolver.regionForCustomer(command.recipientIdentifier());
+			case STAFF -> regionResolver.regionFor(RecipientType.STAFF,
+					command.recipientIdentifier(), command.provinceCode());
+		};
+	}
+
+	private DeliveryStatus deliveryStatusOnArrival(DeliveryChannel channel) {
+		return channel == DeliveryChannel.IN_APP ? DeliveryStatus.SENT : DeliveryStatus.PENDING;
+	}
+
+		// --- The recipient's own history -----------------------------------------
 
 	@Override
 	public NotificationListDto list(String callerId, Role callerRole, Boolean unreadOnly,

@@ -74,17 +74,7 @@ public class NotificationRegionResolver {
 	}
 
 		/**
-	 * The store holding a signed-in customer's notifications, for the read path (§9.1, §9.2).
-	 *
-	 * <p><b>Not the same question as {@link #regionFor}, despite the similar shape.</b> That
-	 * one places a <em>new</em> notification and has a province in hand to place it by. This
-	 * one finds where an <em>existing</em> customer's history already is, and has only the id
-	 * from the caller's token — so the fallback is the customer's own profile, not a province.
-	 *
-	 * <p>The directory is asked first because Milestone 1 makes it the routing mechanism:
-	 * business code never names a store, the lookup does. On a miss the profile answers and
-	 * the directory is <b>backfilled</b> — which is the rebuild-from-customer-records path
-	 * Milestone 1 describes, happening one customer at a time instead of as a migration.
+	 * The store holding a customer's notifications — read or written (§9.1, §9.2, Req 3.3.U2).
 	 *
 	 * @throws IllegalStateException when no profile exists for this id. A caller reaching here
 	 *         has already passed authentication, so their {@code sub} naming no customer is a

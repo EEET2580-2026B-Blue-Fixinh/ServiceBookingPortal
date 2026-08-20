@@ -2,6 +2,8 @@ package com.fixinh.sbp.modules.notification.interfaces.internal;
 
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
+import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
+import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
 
 /**
  * What other modules may ask of the notification module.
@@ -22,4 +24,16 @@ public interface NotificationInternalService {
 	 *         store there is nowhere to file the notification, so there is nothing to report.
 	 */
 	StaffWelcomeEmailResult sendStaffWelcomeEmail(StaffWelcomeEmailCommand command);
+
+
+	/**
+	 * Records a notification and returns it
+	 *
+	 * @throws IllegalArgumentException if the command is incomplete
+	 * @throws IllegalStateException if the recipient is a customer with no profile, so there is
+	 *         no store to file this in
+	 * @throws com.fixinh.sbp.common.exception.ApiException 400 {@code PROVINCE_CODE_INVALID} when
+	 *         the recipient is a staff member whose branch province cannot be turned into a store
+	 */
+	NotificationDto raise(NotificationCreateCommand command);
 }
