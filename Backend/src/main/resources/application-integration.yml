@@ -4,6 +4,31 @@ fixinh:
   sbp:
     smp:
       mode: live
+    email:
+      # The only profile that sends for real (Req 3.1.S5).
+      mode: smtp
+
+# Provider transport. Bound by Spring Boot's own MailProperties, which is why it
+# sits under spring.mail rather than fixinh.sbp.
+#
+# None of these have a default. A missing variable fails the application at
+# startup with the name of the variable, which is the right outcome: the
+# alternative is booting happily and discovering weeks later that no staff
+# member ever received a welcome email.
+spring:
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true
+      # Boot leaves these infinite. One unresponsive provider would otherwise pin
+      # the retry scheduler's thread until the process is restarted.
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
 
 server:
   ssl:

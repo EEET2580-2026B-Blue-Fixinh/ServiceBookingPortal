@@ -1,15 +1,20 @@
 package com.fixinh.sbp.modules.admin.interfaces.internal;
 
 import java.util.List;
+import java.util.Optional;
 
+import com.fixinh.sbp.common.security.AccountStatus;
 import com.fixinh.sbp.modules.admin.dto.external.StaffDto;
 import com.fixinh.sbp.modules.admin.dto.internal.StaffCreateCommand;
 import com.fixinh.sbp.modules.admin.dto.internal.StaffUpdateCommand;
+import com.fixinh.sbp.modules.admin.model.Administrator;
 import com.fixinh.sbp.modules.customer.dto.external.CustomerDto;
-import com.fixinh.sbp.modules.customer.model.AccountStatus;
 
-/** Business logic behind the admin controllers (Req 3.5.S1, 3.5.S2). */
+/** What other modules — and the admin controllers — may ask of the admin module. */
 public interface AdminInternalService {
+
+	/** The profile behind a token's {@code sub}, or empty if this id is not an administrator's. */
+	Optional<Administrator> findById(String id);
 
 	List<CustomerDto> listCustomers();
 

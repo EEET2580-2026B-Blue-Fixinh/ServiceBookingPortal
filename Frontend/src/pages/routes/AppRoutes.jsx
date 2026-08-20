@@ -7,6 +7,7 @@ import { AdminRoute } from './AdminRoute'
 import { MyBookingsPage } from '../booking/MyBookingsPage'
 import { AdminCustomersPage } from '../admin/AdminCustomersPage'
 import { AdminStaffPage } from '../admin/AdminStaffPage'
+import { AdminHomePage } from '../admin/AdminHomePage'
 
 export function AppRoutes() {
   return (
@@ -22,7 +23,11 @@ export function AppRoutes() {
         <Route path={ROUTES.BOOKING} element={<MyBookingsPage />} />
       </Route>
 
+      {/* Admins only. AdminRoute turns away a signed-in CUSTOMER as well as an
+          unauthenticated visitor, so this is a stricter nesting than above —
+          not an addition to it. */}
       <Route element={<AdminRoute />}>
+        <Route path={ROUTES.ADMIN} element={<AdminHomePage />} />
         <Route path="/admin/customers" element={<AdminCustomersPage />} />
         <Route path="/admin/staff" element={<AdminStaffPage />} />
       </Route>

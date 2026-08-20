@@ -18,6 +18,7 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   BOOKING: '/booking',
+  ADMIN: '/admin',
 }
 
 /**

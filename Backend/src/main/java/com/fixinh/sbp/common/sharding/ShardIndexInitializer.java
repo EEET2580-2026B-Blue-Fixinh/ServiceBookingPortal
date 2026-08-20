@@ -10,21 +10,14 @@ import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
 
+import com.fixinh.sbp.modules.customer.model.Customer;
+import com.fixinh.sbp.modules.notification.model.Notification;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Creates the unique indexes both regional stores need (Req 3.1.S2), after the
  * application is up rather than while its beans are being built.
- *
- * <p>Spring Data's {@code auto-index-creation} does this inside the
- * {@code MongoTemplate} constructor, which makes a writable cluster a condition
- * of the bean existing at all — one cold or paused shard then takes the whole
- * application down, and {@code ShardHealthConfig} never gets to report which.
- * Running here instead means a shard that is asleep costs its own indexes and
- * nothing else.
- *
- * <p>{@code createIndex} is idempotent: an index that already matches is left
- * alone, so this is safe on every boot.
  */
 @Component
 @Slf4j
@@ -44,6 +37,8 @@ public class ShardIndexInitializer {
     public void ensureIndexes() {
         ensureCustomerIndexes(south, Region.SOUTH);
         ensureCustomerIndexes(north, Region.NORTH);
+        ensureNotificationIndexes(south, Region.SOUTH);
+        ensureNotificationIndexes(north, Region.NORTH);
     }
 
     /**
@@ -63,6 +58,40 @@ public class ShardIndexInitializer {
         catch (RuntimeException ex) {
             log.warn("Could not ensure customer indexes on {} shard — uniqueness is "
                     + "NOT enforced there until this succeeds", region, ex);
+        }
+    }
+
+    /**
+     * Notification indexes (Req 3.1.S5, and §9.1/§9.2 ahead of issue 5.0).
+     */
+    private void ensureNotificationIndexes(MongoTemplate template, Region region) {
+        try {
+            // §9.1, "newest first" for one recipient -- the bell menu's main query.
+            template.indexOps(Notification.class).createIndex(
+                    new Index().on("recipientIdentifier", Sort.Direction.ASC)
+                            .on("createdAt", Sort.Direction.DESC));
+
+            // §9.1 with unreadOnly=true, and the badge count. Separate rather than folded
+            // into the one above: Mongo cannot skip a middle key to reach the sort field,
+            // so a single compound index would leave one of the two queries unserved.
+            template.indexOps(Notification.class).createIndex(
+                    new Index().on("recipientIdentifier", Sort.Direction.ASC)
+                            .on("readStatus", Sort.Direction.ASC)
+                            .on("createdAt", Sort.Direction.DESC));
+
+            // The retry sweeper's query: what is still outstanding, oldest attempt first.
+            // Matches few documents in practice, which is the point -- without it the
+            // sweeper would scan every notification ever sent, on a schedule.
+            template.indexOps(Notification.class).createIndex(
+                    new Index().on("deliveryStatus", Sort.Direction.ASC)
+                            .on("lastAttemptAt", Sort.Direction.ASC));
+
+            log.info("Notification indexes ensured on {} shard ({})", region,
+                    template.getDb().getName());
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure notification indexes on {} shard - reads and the "
+                    + "retry sweep will work but scan collections", region, ex);
         }
     }
 }

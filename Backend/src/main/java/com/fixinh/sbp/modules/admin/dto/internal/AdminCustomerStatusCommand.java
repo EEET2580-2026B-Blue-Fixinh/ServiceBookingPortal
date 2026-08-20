@@ -1,6 +1,6 @@
 package com.fixinh.sbp.modules.admin.dto.internal;
 
-import com.fixinh.sbp.modules.customer.model.AccountStatus;
+import com.fixinh.sbp.common.security.AccountStatus;
 
 import jakarta.validation.constraints.NotNull;
 

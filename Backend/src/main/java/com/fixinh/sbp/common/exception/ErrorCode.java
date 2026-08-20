@@ -44,7 +44,6 @@ public enum ErrorCode {
 	// --- Top-level: admin (Req 3.5.S2, 3.5.S1) ---
 	CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "No customer exists with this id."),
 	STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "SMP does not know that staff identifier."),
-	SMP_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "SMP could not be reached."),
 
 	/**
 	 * Defined so the catalogue is complete, but no limiter is wired yet — login rate limiting
@@ -54,6 +53,24 @@ public enum ErrorCode {
 
 	INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,
 			"Something went wrong on our side. Quote the traceId when reporting it."),
+
+	// --- Top-level: booking (API Documentation §7.1, Req 3.3.S1–S3) ---
+	SERVICE_NOT_FOUND(HttpStatus.NOT_FOUND,
+			"The requested repair service is unknown or no longer active."),
+	PREFERRED_DATE_IN_PAST(HttpStatus.UNPROCESSABLE_CONTENT,
+			"The preferred service date has already passed."),
+	TIME_WINDOW_INVALID(HttpStatus.UNPROCESSABLE_CONTENT,
+			"The end time must be after the start time, with at least 60 minutes between them."),
+	/**
+	 * Defined so the catalogue matches the API doc, but the mock SMP client never fails —
+	 * genuinely reachable only once a live client can time out or refuse (§2.8).
+	 */
+	SMP_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+			"The booking service is temporarily unavailable. Please try again."),
+
+	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
+			"The staff account was created, but the welcome email could not be sent. "
+					+ "It will be retried automatically."),
 
 	// --- Field-level: password (Req 3.1.M1) ---
 	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,

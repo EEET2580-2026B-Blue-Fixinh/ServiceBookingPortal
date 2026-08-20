@@ -2,15 +2,16 @@ package com.fixinh.sbp.modules.customer.dto.external;
 
 import java.time.Instant;
 
-import com.fixinh.sbp.modules.customer.model.AccountStatus;
+import com.fixinh.sbp.common.security.AccountStatus;
+import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.modules.customer.model.Customer;
-import com.fixinh.sbp.modules.customer.model.Role;
 
 /**
  * A customer, shaped for other modules and the admin API (Req A.2.3, 3.5.S2).
  *
- * <p>Never carries {@code passwordHash}, {@code authProviders}, or {@code homeRegion} — those are
- * the customer module's own concerns, not something a caller needs.
+ * <p>{@code phoneNumber} and {@code accountStatus} live on the credential now, not the profile —
+ * so building this needs both, which is why {@link #from} takes them separately rather than a
+ * single {@code Customer}. Never carries {@code passwordHash}.
  */
 public record CustomerDto(
 		String customerId,
@@ -22,15 +23,15 @@ public record CustomerDto(
 		AddressDto address,
 		Instant registeredAt) {
 
-	public static CustomerDto from(Customer customer) {
+	public static CustomerDto from(Customer profile, String phoneNumber, AccountStatus accountStatus) {
 		return new CustomerDto(
-				customer.getId(),
-				customer.getEmail(),
-				customer.getPhoneNumber(),
-				customer.getFullName(),
-				customer.getRole(),
-				customer.getAccountStatus(),
-				AddressDto.from(customer.getAddress()),
-				customer.getRegisteredAt());
+				profile.getId(),
+				profile.getEmail(),
+				phoneNumber,
+				profile.getFullName(),
+				profile.getRole(),
+				accountStatus,
+				AddressDto.from(profile.getAddress()),
+				profile.getRegisteredAt());
 	}
 }

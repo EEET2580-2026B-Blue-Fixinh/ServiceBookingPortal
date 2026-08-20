@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import com.fixinh.sbp.common.config.SbpProperties;
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
-import com.fixinh.sbp.modules.customer.model.Customer;
+import com.fixinh.sbp.modules.auth.model.UserCredential;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -46,15 +46,19 @@ public class JwtTokenProvider {
 		this.accessTokenTtl = Duration.ofMinutes(jwt.getAccessTokenTtlMinutes());
 	}
 
-	public String generate(Customer customer) {
+	/**
+	 * Built from the credential rather than a profile: the credential is what authentication
+	 * actually verified, and its discriminator is the authoritative role.
+	 */
+	public String generate(UserCredential credential) {
 		Instant issuedAt = Instant.now();
 		Instant expiresAt = issuedAt.plus(accessTokenTtl);
 
 		return Jwts.builder()
-				.subject(customer.getId())
+				.subject(credential.getId())
 				.issuer(issuer)
-				.claim(CLAIM_EMAIL, customer.getEmail())
-				.claim(CLAIM_ROLE, customer.getRole().name())
+				.claim(CLAIM_EMAIL, credential.getEmail())
+				.claim(CLAIM_ROLE, credential.getAccountRole().name())
 				.id(UUID.randomUUID().toString())
 				.issuedAt(Date.from(issuedAt))
 				.expiration(Date.from(expiresAt))
