@@ -1,7 +1,6 @@
 package com.fixinh.sbp.modules.notification.service;
 
 import java.util.Optional;
-
 import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.common.exception.ApiException;
@@ -10,19 +9,23 @@ import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
 import com.fixinh.sbp.common.sharding.SubjectType;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Decides which store a notification belongs in (Region type)
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationRegionResolver {
 
 	private final ShardDirectoryRepository shardDirectory;
 	private final RegionResolver regionResolver;
+	private final CustomerExternalService customerService;
 
 	/**
 	 * The store this recipient's notifications belong in, registering the subject if the
@@ -68,6 +71,64 @@ public class NotificationRegionResolver {
 		// register returns the region it recorded, so the miss path reads as one expression.
 		return shardDirectory.register(subjectType, recipientIdentifier,
 				regionResolver.resolve(provinceCode));
+	}
+
+		/**
+	 * The store holding a signed-in customer's notifications, for the read path (§9.1, §9.2).
+	 *
+	 * <p><b>Not the same question as {@link #regionFor}, despite the similar shape.</b> That
+	 * one places a <em>new</em> notification and has a province in hand to place it by. This
+	 * one finds where an <em>existing</em> customer's history already is, and has only the id
+	 * from the caller's token — so the fallback is the customer's own profile, not a province.
+	 *
+	 * <p>The directory is asked first because Milestone 1 makes it the routing mechanism:
+	 * business code never names a store, the lookup does. On a miss the profile answers and
+	 * the directory is <b>backfilled</b> — which is the rebuild-from-customer-records path
+	 * Milestone 1 describes, happening one customer at a time instead of as a migration.
+	 *
+	 * @throws IllegalStateException when no profile exists for this id. A caller reaching here
+	 *         has already passed authentication, so their {@code sub} naming no customer is a
+	 *         data-integrity fault on our side, not a client error — the same reading, and the
+	 *         same exception, {@code BookingServiceImpl} applies to the same situation.
+	 */
+	public Region regionForCustomer(String customerId) {
+		if (customerId == null || customerId.isBlank()) {
+			throw new IllegalArgumentException(
+					"A notification read needs the caller's customer id.");
+		}
+
+		Optional<Region> alreadyKnown =
+				shardDirectory.findRegion(SubjectType.CUSTOMER, customerId);
+		if (alreadyKnown.isPresent()) {
+			return alreadyKnown.get();
+		}
+
+		Region fromProfile = customerService.findHomeRegion(customerId)
+				.orElseThrow(() -> new IllegalStateException(
+						"Authenticated customer " + customerId + " has no profile, so there "
+								+ "is no store to read their notifications from."));
+
+		return rememberQuietly(customerId, fromProfile);
+	}
+
+	/**
+	 * Records the answer for next time, and returns it whether or not that succeeded.
+	 *
+	 * <p>The backfill is a cache write, so it must not be able to fail the read that triggered
+	 * it. By this point the region is already known from the profile — throwing here would
+	 * discard a correct answer because writing it down went wrong, which is strictly worse
+	 * than being slow again next time. Logged at warn so a directory that is persistently
+	 * unwritable is still visible.
+	 */
+	private Region rememberQuietly(String customerId, Region region) {
+		try {
+			return shardDirectory.register(SubjectType.CUSTOMER, customerId, region);
+		}
+		catch (RuntimeException ex) {
+			log.warn("Could not record customer {} in the shard directory; falling back to "
+					+ "their profile again on the next read", customerId, ex);
+			return region;
+		}
 	}
 
 	/**

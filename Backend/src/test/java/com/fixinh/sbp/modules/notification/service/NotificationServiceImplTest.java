@@ -27,6 +27,7 @@ import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
 import com.fixinh.sbp.common.sharding.SubjectType;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 import com.fixinh.sbp.modules.notification.model.DeliveryChannel;
@@ -83,7 +84,10 @@ class NotificationServiceImplTest {
 
 		service = new NotificationServiceImpl(
 				new StaffWelcomeEmailComposer(properties),
-				new NotificationRegionResolver(shardDirectory, new RegionResolver()),
+				// A staff welcome email routes by branch province, never by a customer profile,
+				// so the customer service is a bare mock here -- unused by this path on purpose.
+				new NotificationRegionResolver(
+						shardDirectory, new RegionResolver(), mock(CustomerExternalService.class)),
 				repository,
 				emailClient);
 	}
