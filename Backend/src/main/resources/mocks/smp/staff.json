@@ -1,0 +1,66 @@
+[
+	{
+		"staffId": "TEC-014",
+		"fullName": "John Tran",
+		"email": "john.tran@fixinh.vn",
+		"phoneNumber": "0987654321",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "12",
+			"streetName": "Nguyen Trai",
+			"ward": "Ben Thanh Ward",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-021",
+		"fullName": "Le Thanh Tung",
+		"email": "tung.le@fixinh.vn",
+		"phoneNumber": "0918222555",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "45",
+			"streetName": "Tran Hung Dao",
+			"ward": "Cau Kho Ward",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-005",
+		"fullName": "Hoang Thi Lan",
+		"email": "lan.hoang@fixinh.vn",
+		"phoneNumber": "0918222666",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "8",
+			"streetName": "Le Loi",
+			"ward": "Ben Nghe Ward",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-032",
+		"fullName": "Bui Van Khoa",
+		"email": "khoa.bui@fixinh.vn",
+		"phoneNumber": "0918222777",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "INACTIVE",
+		"address": {
+			"streetNumber": "20",
+			"streetName": "Hai Ba Trung",
+			"ward": "Tan Dinh Ward",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	}
+]
