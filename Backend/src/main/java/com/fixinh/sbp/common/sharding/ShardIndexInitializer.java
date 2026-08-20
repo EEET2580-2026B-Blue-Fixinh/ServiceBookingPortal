@@ -9,8 +9,6 @@ import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
-
-import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.notification.model.Notification;
 
 import lombok.extern.slf4j.Slf4j;
