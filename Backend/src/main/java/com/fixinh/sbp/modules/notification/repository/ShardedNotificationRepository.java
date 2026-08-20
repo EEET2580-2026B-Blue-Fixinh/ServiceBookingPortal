@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import com.fixinh.sbp.common.sharding.Region;
@@ -16,12 +17,19 @@ import com.fixinh.sbp.common.sharding.ShardMongoConfig;
 import com.fixinh.sbp.modules.notification.model.DeliveryChannel;
 import com.fixinh.sbp.modules.notification.model.DeliveryStatus;
 import com.fixinh.sbp.modules.notification.model.Notification;
+import com.fixinh.sbp.modules.notification.model.RecipientType;
 
 /**
  * Notifications across the north and south stores.
  */
 @Repository
 public class ShardedNotificationRepository implements NotificationRepository {
+
+	private static final String FIELD_ID = "_id";
+	private static final String FIELD_RECIPIENT_TYPE = "recipientType";
+	private static final String FIELD_RECIPIENT_IDENTIFIER = "recipientIdentifier";
+	private static final String FIELD_READ_STATUS = "readStatus";
+	private static final String FIELD_CREATED_AT = "createdAt";
 
 	private final MongoTemplate south;
 	private final MongoTemplate north;
@@ -51,7 +59,7 @@ public class ShardedNotificationRepository implements NotificationRepository {
 			return Optional.empty();
 		}
 
-		Query query = Query.query(Criteria.where("_id").is(id));
+		Query query = Query.query(Criteria.where(FIELD_ID).is(id));
 
 		// South first, then north -- the same order ShardedCustomerRepository uses. Neither
 		// store is more likely, so consistency between the two classes is the tie-breaker.
@@ -62,7 +70,7 @@ public class ShardedNotificationRepository implements NotificationRepository {
 		return Optional.ofNullable(found);
 	}
 
-		@Override
+	@Override
 	public List<Notification> findOutstandingEmails(int limit) {
 		// Field order matches the {deliveryStatus, lastAttemptAt} index from patch 3, so this
 		// reads an index range rather than scanning every notification ever sent.
@@ -78,6 +86,104 @@ public class ShardedNotificationRepository implements NotificationRepository {
 		List<Notification> outstanding = new ArrayList<>(south.find(query, Notification.class));
 		outstanding.addAll(north.find(query, Notification.class));
 		return outstanding;
+	}
+
+	@Override
+	public List<Notification> findForRecipient(Region region, RecipientType recipientType,
+			String recipientIdentifier, boolean unreadOnly, int page, int size) {
+
+		requireRecipient(region, recipientType, recipientIdentifier);
+
+		Query query = recipientQuery(recipientType, recipientIdentifier, unreadOnly)
+				.with(Sort.by(Sort.Direction.DESC, FIELD_CREATED_AT))
+				.skip((long) page * size)
+				.limit(size);
+
+		return templateFor(region).find(query, Notification.class);
+	}
+
+	@Override
+	public long count(Region region, RecipientType recipientType, String recipientIdentifier,
+			boolean unreadOnly) {
+
+		requireRecipient(region, recipientType, recipientIdentifier);
+
+		return templateFor(region).count(
+				recipientQuery(recipientType, recipientIdentifier, unreadOnly),
+				Notification.class);
+	}
+
+	@Override
+	public boolean markRead(Region region, RecipientType recipientType,
+			String recipientIdentifier, String notificationId) {
+
+		requireRecipient(region, recipientType, recipientIdentifier);
+		if (notificationId == null || notificationId.isBlank()) {
+			return false;
+		}
+
+		// The recipient is part of the match, so somebody else's notification is simply not
+		// found -- §9.2's 404 falls out of the query rather than being decided afterwards.
+		Query query = Query.query(Criteria.where(FIELD_ID).is(notificationId)
+				.and(FIELD_RECIPIENT_TYPE).is(recipientType)
+				.and(FIELD_RECIPIENT_IDENTIFIER).is(recipientIdentifier));
+
+		var result = templateFor(region)
+				.updateFirst(query, Update.update(FIELD_READ_STATUS, true), Notification.class);
+
+		// getMatchedCount, NOT getModifiedCount. Marking an already-read notification changes
+		// nothing, so modified would be 0 -- and §9.2 requires that to be a success. Matched
+		// answers the question actually being asked: does this notification belong to you.
+		return result.getMatchedCount() > 0;
+	}
+
+	@Override
+	public long markAllRead(Region region, RecipientType recipientType,
+			String recipientIdentifier) {
+
+		requireRecipient(region, recipientType, recipientIdentifier);
+
+		// One updateMulti rather than a read followed by a loop of writes: the set of unread
+		// notifications cannot change underneath us between the two halves of an operation
+		// that does not have two halves.
+		Query query = recipientQuery(recipientType, recipientIdentifier, true);
+
+		return templateFor(region)
+				.updateMulti(query, Update.update(FIELD_READ_STATUS, true), Notification.class)
+				.getModifiedCount();
+	}
+
+	/**
+	 * The predicate every recipient-scoped operation shares.
+	 */
+	private Query recipientQuery(RecipientType recipientType, String recipientIdentifier,
+			boolean unreadOnly) {
+
+		Criteria criteria = Criteria.where(FIELD_RECIPIENT_IDENTIFIER).is(recipientIdentifier)
+				.and(FIELD_RECIPIENT_TYPE).is(recipientType);
+
+		if (unreadOnly) {
+			criteria = criteria.and(FIELD_READ_STATUS).is(false);
+		}
+
+		return Query.query(criteria);
+	}
+
+	/**
+	 * <b>Refuses rather than defaults.
+	 */
+	private void requireRecipient(Region region, RecipientType recipientType,
+			String recipientIdentifier) {
+
+		if (region == null) {
+			throw new IllegalStateException(
+					"No region was resolved, so there is no store to read notifications from.");
+		}
+		if (recipientType == null || recipientIdentifier == null
+				|| recipientIdentifier.isBlank()) {
+			throw new IllegalArgumentException(
+					"A notification lookup needs a recipient type and identifier.");
+		}
 	}
 
 	private MongoTemplate templateFor(Region region) {
