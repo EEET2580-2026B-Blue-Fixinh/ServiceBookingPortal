@@ -94,8 +94,12 @@ public class ShardedNotificationRepository implements NotificationRepository {
 
 		requireRecipient(region, recipientType, recipientIdentifier);
 
-		Query query = recipientQuery(recipientType, recipientIdentifier, unreadOnly)
-				.with(Sort.by(Sort.Direction.DESC, FIELD_CREATED_AT))
+				Query query = recipientQuery(recipientType, recipientIdentifier, unreadOnly)
+				// createdAt alone is not a total order: BSON keeps an Instant to the
+				// millisecond, so tied documents could drift between pages under offset
+				// paging and a reader would see one twice or miss it. _id is unique, and
+				// both notification indexes carry it, so this stays index-served.
+				.with(Sort.by(Sort.Direction.DESC, FIELD_CREATED_AT, FIELD_ID))
 				.skip((long) page * size)
 				.limit(size);
 

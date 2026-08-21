@@ -152,6 +152,20 @@ class ShardedNotificationRepositoryTest {
 	}
 
 	@Test
+	void breaksTiesOnIdSoPagingCannotRepeatOrSkip() {
+		when(south.find(any(Query.class), eq(Notification.class))).thenReturn(List.of());
+
+		repository.findForRecipient(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID,
+				false, 0, 20);
+
+		String sort = captureFind().getSortObject().toString();
+		assertTrue(sort.contains("createdAt"), "newest first");
+		assertTrue(sort.contains("_id"),
+				"and a unique second key -- millisecond timestamps tie, and tied documents "
+						+ "drift between pages without one");
+	}
+
+	@Test
 	void marksAllUnreadInASingleWrite() {
 		when(south.updateMulti(any(Query.class), any(UpdateDefinition.class),
 				eq(Notification.class))).thenReturn(updateResult(5L, 5L));

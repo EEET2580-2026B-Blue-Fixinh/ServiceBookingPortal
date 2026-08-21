@@ -25,7 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @Slf4j
 public class ShardIndexInitializer {
-    
+
     private static final String EMAIL = "email";
     private static final String PHONE_NUMBER = "phoneNumber";
 
@@ -47,8 +47,7 @@ public class ShardIndexInitializer {
         ensureNotificationIndexes(north, Region.NORTH);
     }
 
-    
-     /**
+    /**
      * Customer indexes.
      *
      * <p><b>Nothing here is unique, which is a correction.</b> An earlier version created two
@@ -81,12 +80,12 @@ public class ShardIndexInitializer {
             // rejects a second index over the same fields whatever it is called, so the fields
             // are the only thing worth comparing.
             for (IndexInfo existing : indexes.getIndexInfo()) {
-                if (coversOnly(existing, PHONE_NUMBER)) {
+                if (coversExactly(existing, List.of(PHONE_NUMBER))) {
                     indexes.dropIndex(existing.getName());
                     log.info("Dropped customer index {} on {} shard: phoneNumber is no longer "
                             + "a field on Customer", existing.getName(), region);
                 }
-                else if (coversOnly(existing, EMAIL)) {
+                else if (coversExactly(existing, List.of(EMAIL))) {
                     if (existing.isUnique()) {
                         indexes.dropIndex(existing.getName());
                         log.info("Dropped unique customer index {} on {} shard: an email's "
@@ -114,36 +113,56 @@ public class ShardIndexInitializer {
         }
     }
 
-    /** Whether an index covers exactly one field, and that field is the one named. */
-    private boolean coversOnly(IndexInfo index, String field) {
-        List<IndexField> fields = index.getIndexFields();
-        return fields.size() == 1 && field.equals(fields.get(0).getKey());
+    /** Whether an index covers exactly these fields, in this order. */
+    private boolean coversExactly(IndexInfo index, List<String> fields) {
+        List<IndexField> actual = index.getIndexFields();
+        if (actual.size() != fields.size()) {
+            return false;
+        }
+        for (int i = 0; i < fields.size(); i++) {
+            if (!fields.get(i).equals(actual.get(i).getKey())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
-     * Notification indexes (Req 3.1.S5, and §9.1/§9.2 ahead of issue 5.0).
+     * Notification indexes (Req 3.1.S5, §9.1, §9.2).
      */
     private void ensureNotificationIndexes(MongoTemplate template, Region region) {
         try {
+            IndexOperations indexes = template.indexOps(Notification.class);
+            dropSupersededNotificationIndexes(indexes, region);
+
             // §9.1, "newest first" for one recipient -- the bell menu's main query.
-            template.indexOps(Notification.class).createIndex(
-                    new Index().on("recipientIdentifier", Sort.Direction.ASC)
-                            .on("createdAt", Sort.Direction.DESC));
+            //
+            // _id closes the sort. BSON stores an Instant to the millisecond, so two
+            // notifications raised from the same SMP event batch can share a createdAt; with
+            // offset paging, tied documents are free to move between pages and the reader
+            // sees one twice or not at all. _id is unique, so the order becomes total.
+            // Keeping it in the index means the sort is still served by a walk of the index
+            // rather than a blocking sort in memory.
+            indexes.createIndex(new Index()
+                    .on("recipientIdentifier", Sort.Direction.ASC)
+                    .on("createdAt", Sort.Direction.DESC)
+                    .on("_id", Sort.Direction.DESC));
 
             // §9.1 with unreadOnly=true, and the badge count. Separate rather than folded
             // into the one above: Mongo cannot skip a middle key to reach the sort field,
             // so a single compound index would leave one of the two queries unserved.
-            template.indexOps(Notification.class).createIndex(
-                    new Index().on("recipientIdentifier", Sort.Direction.ASC)
-                            .on("readStatus", Sort.Direction.ASC)
-                            .on("createdAt", Sort.Direction.DESC));
+            indexes.createIndex(new Index()
+                    .on("recipientIdentifier", Sort.Direction.ASC)
+                    .on("readStatus", Sort.Direction.ASC)
+                    .on("createdAt", Sort.Direction.DESC)
+                    .on("_id", Sort.Direction.DESC));
 
             // The retry sweeper's query: what is still outstanding, oldest attempt first.
             // Matches few documents in practice, which is the point -- without it the
             // sweeper would scan every notification ever sent, on a schedule.
-            template.indexOps(Notification.class).createIndex(
-                    new Index().on("deliveryStatus", Sort.Direction.ASC)
-                            .on("lastAttemptAt", Sort.Direction.ASC));
+            indexes.createIndex(new Index()
+                    .on("deliveryStatus", Sort.Direction.ASC)
+                    .on("lastAttemptAt", Sort.Direction.ASC));
 
             log.info("Notification indexes ensured on {} shard ({})", region,
                     template.getDb().getName());
@@ -151,6 +170,30 @@ public class ShardIndexInitializer {
         catch (RuntimeException ex) {
             log.warn("Could not ensure notification indexes on {} shard - reads and the "
                     + "retry sweep will work but scan collections", region, ex);
+        }
+    }
+
+    /**
+     * Removes the two-key and three-key list indexes that the {@code _id} tie-breaker
+     * supersedes.
+     *
+     * <p>Each is a prefix of its replacement, so it can serve nothing the longer one cannot,
+     * and leaving it would cost a write on every notification for no read it makes faster.
+     * A no-op after the first run, and on a fresh database.
+     */
+    private void dropSupersededNotificationIndexes(IndexOperations indexes, Region region) {
+        List<List<String>> superseded = List.of(
+                List.of("recipientIdentifier", "createdAt"),
+                List.of("recipientIdentifier", "readStatus", "createdAt"));
+
+        for (IndexInfo existing : indexes.getIndexInfo()) {
+            for (List<String> keys : superseded) {
+                if (coversExactly(existing, keys)) {
+                    indexes.dropIndex(existing.getName());
+                    log.info("Dropped notification index {} on {} shard: superseded by the "
+                            + "same keys plus _id", existing.getName(), region);
+                }
+            }
         }
     }
 }

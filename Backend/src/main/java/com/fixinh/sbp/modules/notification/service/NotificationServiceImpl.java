@@ -84,24 +84,26 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 
 		// --- Raising one, for Integration and Admin -------------------------------
 
-	@Override
+		@Override
 	public NotificationDto raise(NotificationCreateCommand command) {
 		Region region = storeFor(command);
+		Instant now = Instant.now();
 
+		// IN_APP and SENT are fixed here rather than taken from the command. Writing the row
+		// is the delivery: there is no provider to accept it, nothing for the retry sweeper to
+		// do, and no address or rendered body that a resend would need. An EMAIL record raised
+		// this way would be abandoned on the sweeper's first pass for lacking exactly those.
 		Notification saved = notificationRepository.save(Notification.builder()
 				.recipientType(command.recipientType())
 				.recipientIdentifier(command.recipientIdentifier())
 				.type(command.type())
-				.deliveryChannel(command.deliveryChannel())
+				.deliveryChannel(DeliveryChannel.IN_APP)
 				.message(command.message())
 				.bookingRef(command.bookingRef())
 				.readStatus(false)
-				.createdAt(Instant.now())
-				// An in-app notification is delivered by being written -- there is no provider to
-				// accept it and nothing for the retry sweeper to do, so it is SENT on arrival. An
-				// email one stays PENDING and the sweeper picks it up.
-				.deliveryStatus(deliveryStatusOnArrival(command.deliveryChannel()))
-				.sentAt(command.deliveryChannel() == DeliveryChannel.IN_APP ? Instant.now() : null)
+				.createdAt(now)
+				.deliveryStatus(DeliveryStatus.SENT)
+				.sentAt(now)
 				.homeRegion(region)
 				.build());
 

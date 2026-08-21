@@ -389,13 +389,20 @@ class NotificationServiceImplTest {
 	}
 
 	@Test
-	void anEmailNotificationStaysPendingForTheSweeper() {
-		service.raise(new NotificationCreateCommand(RecipientType.CUSTOMER, CUSTOMER_ID, null,
-				NotificationType.BOOKING_CONFIRMED, DeliveryChannel.EMAIL, "Confirmed.", "ORD-1"));
+	void everythingRaisedThisWayIsDeliverableOrDeliveredAlready() {
+		service.raise(NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_CONFIRMED, "Confirmed.", "ORD-1"));
 
 		Notification written = saves.get(0);
-		assertEquals(DeliveryStatus.PENDING, written.getDeliveryStatus());
-		assertNull(written.getSentAt(), "nothing has been sent yet");
+		assertEquals(DeliveryChannel.IN_APP, written.getDeliveryChannel());
+		assertEquals(DeliveryStatus.SENT, written.getDeliveryStatus());
+		assertNotNull(written.getSentAt());
+
+		// The point of the restriction. A row the sweeper picks up but cannot resend gets
+		// abandoned on the first pass, at ERROR -- and raise() had been able to create one.
+		assertFalse(written.isAwaitingDelivery(),
+				"nothing raised this way may ever reach the retry sweeper");
+		assertNull(written.getUndeliveredBody());
 	}
 
 	@Test
