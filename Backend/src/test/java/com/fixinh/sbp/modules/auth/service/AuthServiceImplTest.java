@@ -3,6 +3,7 @@ package com.fixinh.sbp.modules.auth.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,6 +67,20 @@ class AuthServiceImplTest {
 		assertEquals("google-sub-1", credential.getAuthenticationIdentities().get(0)
 				.getExternalAccountIdentifier());
 		verify(credentials).save(credential);
+	}
+
+	@Test
+	void googleLoginPrefersTheStableSubjectOverEmail() {
+		UserCredential credential = credential(Region.SOUTH);
+		when(googleOAuth.verifyCodeAndGetUser("code", "http://localhost/login"))
+				.thenReturn(new GoogleOAuthService.GoogleUserInfo(
+						"google-sub-1", "changed@example.com", "Test User", null));
+		when(credentials.findByGoogleSubject("google-sub-1"))
+				.thenReturn(Optional.of(credential));
+
+		service.loginWithGoogle(new GoogleLoginCommand("code", "http://localhost/login"));
+
+		verify(credentials, never()).findByEmail("changed@example.com");
 	}
 
 
