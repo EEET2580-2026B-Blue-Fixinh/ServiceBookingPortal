@@ -23,7 +23,9 @@ public record AuthTokenDto(
 		/** True if this sign-in just created a new account (Google OAuth only). */
 		Boolean accountCreated,
 		/** True if the user must complete their profile before booking (Google OAuth only). */
-		Boolean profileCompletionRequired) {
+		Boolean profileCompletionRequired,
+		/** True when this sign-in linked Google to an existing password account. */
+		Boolean providerLinked) {
 
 	public record AuthUserDto(
 			String userId,
@@ -38,6 +40,6 @@ public record AuthTokenDto(
 			String tokenType,
 			long expiresIn,
 			AuthUserDto user) {
-		this(accessToken, tokenType, expiresIn, user, null, null);
+		this(accessToken, tokenType, expiresIn, user, null, null, null);
 	}
 }

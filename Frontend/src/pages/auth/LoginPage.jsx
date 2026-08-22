@@ -104,7 +104,12 @@ export function LoginPage() {
           const canReturn =
             intended && intended.startsWith(ROUTES.ADMIN) === isAdmin;
 
-          navigate(canReturn ? intended : home, { replace: true });
+          navigate(canReturn ? intended : home, {
+            replace: true,
+            state: session.providerLinked
+              ? { googleAccountLinked: true }
+              : undefined,
+          });
         } catch (error) {
           setFormError(
             error.message || "Google sign-in failed. Please try again.",

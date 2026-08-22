@@ -181,6 +181,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 
 		boolean accountCreated = false;
 		boolean profileCompletionRequired = false;
+		boolean providerLinked = false;
 		UserCredential credential;
 
 		if (existingCredential.isPresent()) {
@@ -197,6 +198,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 					|| credential.getAuthenticationIdentities().stream()
 							.noneMatch(identity -> AuthProvider.GOOGLE == identity.getProvider());
 			if (!currentProviders.contains(AuthProvider.GOOGLE) || identityMissing) {
+				providerLinked = !currentProviders.contains(AuthProvider.GOOGLE);
 				Set<AuthProvider> providers = new HashSet<>(currentProviders);
 				providers.add(AuthProvider.GOOGLE);
 				credential.setAuthProviders(providers);
@@ -265,7 +267,8 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 						credential.getEmail(),
 						credential.getAccountRole()),
 				accountCreated,
-				profileCompletionRequired);
+				profileCompletionRequired,
+				providerLinked);
 	}
 
 	private AuthenticationIdentity googleIdentity(String subject) {
