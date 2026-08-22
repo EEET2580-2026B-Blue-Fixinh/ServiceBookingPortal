@@ -35,4 +35,20 @@ export const API_ENDPOINTS = {
   REFERENCE: {
     PROVINCES: "/reference/provinces",
   },
+  // The signed-in caller's own notifications (API Documentation Section 9). Every
+  // one of these acts on whoever the token names; none of them takes a recipient.
+  //
+  // READ is a function rather than a string because its path has an identifier in
+  // the middle of it. That is still only the path — the rule this file states is
+  // that the method and the body live with the caller, not that the value has to
+  // be a literal. Building '/read' onto a bare '/notifications' inside the
+  // endpoint module would be the actual break, because then no single line here
+  // would tell you the whole URL. Section 2.6 calls identifiers opaque, so the
+  // segment is encoded rather than trusted to be URL-safe.
+  NOTIFICATIONS: {
+    LIST: "/notifications",
+    READ: (notificationId) =>
+      `/notifications/${encodeURIComponent(notificationId)}/read`,
+    READ_ALL: "/notifications/read-all",
+  },
 };
