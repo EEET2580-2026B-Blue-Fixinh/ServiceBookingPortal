@@ -14,6 +14,7 @@ import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
+import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.notification.model.Notification;
 
 import lombok.extern.slf4j.Slf4j;
@@ -43,8 +44,52 @@ public class ShardIndexInitializer {
     public void ensureIndexes() {
         ensureCustomerIndexes(south, Region.SOUTH);
         ensureCustomerIndexes(north, Region.NORTH);
+        ensureCredentialIndexes(south, Region.SOUTH);
+        ensureCredentialIndexes(north, Region.NORTH);
         ensureNotificationIndexes(south, Region.SOUTH);
         ensureNotificationIndexes(north, Region.NORTH);
+    }
+
+    private void ensureCredentialIndexes(MongoTemplate template, Region region) {
+        try {
+            IndexOperations indexes = template.indexOps(UserCredential.class);
+            boolean emailCorrect = false;
+            boolean phoneCorrect = false;
+
+            for (IndexInfo existing : indexes.getIndexInfo()) {
+                if (coversExactly(existing, List.of(EMAIL))) {
+                    if (existing.isUnique()) {
+                        emailCorrect = true;
+                    }
+                    else {
+                        indexes.dropIndex(existing.getName());
+                    }
+                }
+                else if (coversExactly(existing, List.of(PHONE_NUMBER))) {
+                    if (existing.isUnique() && existing.isSparse()) {
+                        phoneCorrect = true;
+                    }
+                    else {
+                        indexes.dropIndex(existing.getName());
+                        log.info("Dropped non-sparse credential phone index {} on {} shard",
+                                existing.getName(), region);
+                    }
+                }
+            }
+
+            if (!emailCorrect) {
+                indexes.createIndex(new Index().on(EMAIL, Sort.Direction.ASC).unique());
+            }
+            if (!phoneCorrect) {
+                indexes.createIndex(new Index().on(PHONE_NUMBER, Sort.Direction.ASC)
+                        .unique().sparse());
+            }
+            log.info("Credential indexes ensured on {} shard ({})", region,
+                    template.getDb().getName());
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure credential indexes on {} shard", region, ex);
+        }
     }
 
     /**
