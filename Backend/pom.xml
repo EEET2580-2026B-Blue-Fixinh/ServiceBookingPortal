@@ -98,11 +98,12 @@
 			<version>2.3.0</version>
 		</dependency>
 
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator-test</artifactId>
-			<scope>test</scope>
-		</dependency>
+	<!-- Google OAuth 2.0 (Req 3.2.U1-U3: Google Sign-In integration) -->
+	<dependency>
+		<groupId>com.google.api-client</groupId>
+		<artifactId>google-api-client</artifactId>
+		<version>2.2.0</version>
+	</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-mongodb-test</artifactId>

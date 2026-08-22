@@ -11,9 +11,16 @@ import org.springframework.stereotype.Service;
 import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
+import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
+import com.fixinh.sbp.common.sharding.SubjectType;
+import com.fixinh.sbp.common.exception.ApiException;
+import com.fixinh.sbp.common.exception.ErrorCode;
+import com.fixinh.sbp.modules.auth.interfaces.internal.CredentialRegionUpdater;
+import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
+import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
 
@@ -34,6 +41,8 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 
 	private final CustomerRepository customerRepository;
 	private final RegionResolver regionResolver;
+	private final CredentialRegionUpdater credentialRegionUpdater;
+	private final ShardDirectoryRepository shardDirectory;
 
 	@Override
 	public Customer createProfile(CustomerCreateCommand command) {
@@ -46,7 +55,10 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 				// Truncated to the precision BSON can hold, so the value returned by register is
 				// the same value every later read reports.
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
-				.homeRegion(regionResolver.resolve(command.address().getProvinceCode()))
+				// Address-less users stay in the default region until shard placement is known.
+				.homeRegion(command.address() != null 
+						? regionResolver.resolve(command.address().getProvinceCode()) 
+						: regionResolver.defaultRegion())
 				.build();
 
 		return customerRepository.save(customer);
@@ -55,6 +67,53 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 	@Override
 	public Optional<Customer> findById(String id) {
 		return customerRepository.findById(id);
+	}
+
+	private void restoreLocation(String customerId, Address address, Region region) {
+		Customer customer = customerRepository.findById(customerId)
+				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
+		Region currentRegion = customer.getHomeRegion();
+		customer.setAddress(address);
+		customer.setHomeRegion(region);
+		customerRepository.relocate(customer, currentRegion);
+	}
+
+	@Override
+	public void completeAddress(String customerId, CompleteAddressCommand command) {
+		Customer customer = customerRepository.findById(customerId)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+		if (customer.getAddress() != null) {
+			throw new ApiException(ErrorCode.VALIDATION_FAILED);
+		}
+		String provinceCode = command.provinceCode().trim();
+		if (!regionResolver.isKnown(provinceCode)) {
+			throw new ApiException(ErrorCode.PROVINCE_CODE_INVALID);
+		}
+		Region previousRegion = customer.getHomeRegion();
+		Address previousAddress = customer.getAddress();
+		Address address = Address.builder()
+				.streetNumber(command.streetNumber().trim())
+				.streetName(command.streetName().trim())
+				.ward(command.ward().trim())
+				.provinceCode(provinceCode)
+				.build();
+		Region targetRegion = regionResolver.resolve(address.getProvinceCode());
+		customer.setAddress(address);
+		customer.setHomeRegion(targetRegion);
+		customerRepository.relocate(customer, previousRegion);
+		try {
+			credentialRegionUpdater.relocateGoogleCredential(customerId, targetRegion);
+			shardDirectory.register(SubjectType.CUSTOMER, customerId, targetRegion);
+		}
+		catch (RuntimeException ex) {
+			try {
+				credentialRegionUpdater.relocateGoogleCredential(customerId, previousRegion);
+			}
+			finally {
+				restoreLocation(customerId, previousAddress, previousRegion);
+			}
+			throw ex;
+		}
 	}
 
 	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */

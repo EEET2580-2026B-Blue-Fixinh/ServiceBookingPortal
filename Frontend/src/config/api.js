@@ -21,16 +21,20 @@ export const API_ENDPOINTS = {
   // Both are reachable without a token — they have to be, since this is where a
   // user goes to get one.
   AUTH: {
-    REGISTER: '/auth/register',
-    LOGIN: '/auth/login',
+    REGISTER: "/auth/register",
+    LOGIN: "/auth/login",
+    GOOGLE_LOGIN: "/auth/oauth/google", // Section 4.3: Google OAuth sign-in
+  },
+
+  CUSTOMERS: {
+    MY_ADDRESS: "/customers/me/address",
   },
 
   // Dropdown data, cacheable for the length of a session. Also public: the
   // registration form needs the province list before an account exists.
   REFERENCE: {
-    PROVINCES: '/reference/provinces',
+    PROVINCES: "/reference/provinces",
   },
-
   // The signed-in caller's own notifications (API Documentation Section 9). Every
   // one of these acts on whoever the token names; none of them takes a recipient.
   //
@@ -42,8 +46,9 @@ export const API_ENDPOINTS = {
   // would tell you the whole URL. Section 2.6 calls identifiers opaque, so the
   // segment is encoded rather than trusted to be URL-safe.
   NOTIFICATIONS: {
-    LIST: '/notifications',
-    READ: (notificationId) => `/notifications/${encodeURIComponent(notificationId)}/read`,
-    READ_ALL: '/notifications/read-all',
+    LIST: "/notifications",
+    READ: (notificationId) =>
+      `/notifications/${encodeURIComponent(notificationId)}/read`,
+    READ_ALL: "/notifications/read-all",
   },
-}
+};

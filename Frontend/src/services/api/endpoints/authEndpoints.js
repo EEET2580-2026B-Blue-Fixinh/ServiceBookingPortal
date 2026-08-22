@@ -1,5 +1,5 @@
-import { apiClient } from '../apiClient'
-import { API_ENDPOINTS } from '../../../config/api'
+import { apiClient } from "../apiClient";
+import { API_ENDPOINTS } from "../../../config/api";
 
 // API Documentation Section 4. Both endpoints are public — a user must reach
 // registration and sign-in before holding a token — so they opt out of the
@@ -15,7 +15,7 @@ import { API_ENDPOINTS } from '../../../config/api'
  *                    ward: string, provinceCode: string}}} payload
  */
 export function register(payload) {
-  return apiClient.post(API_ENDPOINTS.AUTH.REGISTER, payload, { auth: false })
+  return apiClient.post(API_ENDPOINTS.AUTH.REGISTER, payload, { auth: false });
 }
 
 /**
@@ -25,5 +25,18 @@ export function register(payload) {
  *        email address or a phone number; the server works out which.
  */
 export function login(credentials) {
-  return apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials, { auth: false })
+  return apiClient.post(API_ENDPOINTS.AUTH.LOGIN, credentials, { auth: false });
+}
+
+/**
+ * POST /auth/oauth/google (Section 4.3). Exchanges Google authorization code
+ * for a JWT. Returns `{ accessToken, tokenType, expiresIn, user, accountCreated,
+ * profileCompletionRequired }`.
+ *
+ * @param {{code: string}} payload  Authorization code from Google's OAuth redirect.
+ */
+export function googleLogin(payload) {
+  return apiClient.post(API_ENDPOINTS.AUTH.GOOGLE_LOGIN, payload, {
+    auth: false,
+  });
 }

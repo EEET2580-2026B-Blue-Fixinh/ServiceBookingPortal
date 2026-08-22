@@ -54,6 +54,27 @@ public class UserCredentialRepository {
 		return templateFor(credential.getHomeRegion()).save(credential);
 	}
 
+	/** Writes the credential to its new shard, then removes the copy from the previous shard. */
+	public UserCredential relocate(UserCredential credential, Region previousRegion) {
+		Region targetRegion = credential.getHomeRegion();
+		if (previousRegion == targetRegion) {
+			return save(credential);
+		}
+
+		MongoTemplate target = templateFor(targetRegion);
+		UserCredential saved = target.save(credential);
+		try {
+			templateFor(previousRegion).remove(
+					Query.query(Criteria.where("_id").is(credential.getId())), UserCredential.class);
+			return saved;
+		}
+		catch (RuntimeException ex) {
+			target.remove(
+					Query.query(Criteria.where("_id").is(credential.getId())), UserCredential.class);
+			throw ex;
+		}
+	}
+
 	public Optional<UserCredential> findByEmail(String email) {
 		if (email == null || email.isBlank()) {
 			return Optional.empty();
@@ -66,6 +87,16 @@ public class UserCredentialRepository {
 			return Optional.empty();
 		}
 		return findOne(Criteria.where("phoneNumber").is(phoneNumber.trim()));
+	}
+
+	public Optional<UserCredential> findByGoogleSubject(String subject) {
+		if (subject == null || subject.isBlank()) {
+			return Optional.empty();
+		}
+		Criteria identity = Criteria.where("authenticationIdentities").elemMatch(
+				Criteria.where("provider").is("GOOGLE")
+						.and("externalAccountIdentifier").is(subject));
+		return findOne(identity);
 	}
 
 	public boolean existsByEmail(String email) {
@@ -91,6 +122,15 @@ public class UserCredentialRepository {
 		all.addAll(south.find(query, UserCredential.class));
 		all.addAll(north.find(query, UserCredential.class));
 		return all;
+	}
+
+	/**
+	 * Deletes a credential from the appropriate store.
+	 *
+	 * <p>Used for rollback when profile creation fails during Google OAuth sign-in.
+	 */
+	public void delete(UserCredential credential) {
+		templateFor(credential.getHomeRegion()).remove(credential);
 	}
 
 	/**

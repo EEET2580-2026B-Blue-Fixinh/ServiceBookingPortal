@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
+import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
@@ -44,5 +45,11 @@ public class AuthController {
 	@PostMapping("/login")
 	public AuthTokenDto login(@Valid @RequestBody LoginCommand command) {
 		return authService.login(command);
+	}
+
+	/** Section 4.3. Authenticates via Google OAuth 2.0 and issues a JWT (Req 3.2.U1-U3). */
+	@PostMapping("/oauth/google")
+	public AuthTokenDto loginWithGoogle(@Valid @RequestBody GoogleLoginCommand command) {
+		return authService.loginWithGoogle(command);
 	}
 }

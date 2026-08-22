@@ -3,6 +3,7 @@ package com.fixinh.sbp.modules.customer.interfaces.internal;
 import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
@@ -24,4 +25,14 @@ public interface CustomerInternalService {
 
 	/** The profile behind a token's {@code sub}, or empty if this id is not a customer's. */
 	Optional<Customer> findById(String id);
+
+	/**
+	 * Completes the address needed to place a customer in a regional shard (Req 3.1.U1-U2).
+	 *
+	 * <p>Sets the customer's address and resolves their home region. Returns the resolved
+	 * region so the caller can update the credential's homeRegion accordingly.
+	 *
+	 * @return The home region determined by the address province
+	 */
+	void completeAddress(String customerId, CompleteAddressCommand command);
 }

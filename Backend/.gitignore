@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+# Environment and credentials (never commit secrets!)
 .env
 *.env.local
 application-local.yml
+set-google-oauth.sh
+set-mongo-atlas.sh

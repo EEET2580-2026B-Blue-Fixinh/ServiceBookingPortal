@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.auth.interfaces.external;
 
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
+import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 
@@ -24,4 +25,14 @@ public interface AuthExternalService {
 	 *         AUTH_ACCOUNT_DEACTIVATED
 	 */
 	AuthTokenDto login(LoginCommand command);
+
+	/**
+	 * Authenticates via Google OAuth 2.0 (Req 3.2.U1-U3). Exchanges the authorization code for
+	 * a verified Google user profile, then either finds the existing account or creates a new one.
+	 *
+	 * @throws com.fixinh.sbp.common.exception.ApiException OAUTH_CODE_INVALID,
+	 *         OAUTH_PROVIDER_UNAVAILABLE or
+	 *         AUTH_ACCOUNT_DEACTIVATED
+	 */
+	AuthTokenDto loginWithGoogle(GoogleLoginCommand command);
 }

@@ -3,12 +3,20 @@
 // (application-dev.yml), so port 8443 serves plain HTTP locally. Pointing at
 // https:// here fails during the TLS handshake, not with a readable error.
 // Override via VITE_API_URL once the team's self-signed cert is in place.
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8443/api/v1'
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL ?? "http://localhost:8443/api/v1";
+
+// Google OAuth 2.0 configuration (Req 3.2.U1). Client ID comes from Google
+// Cloud Console; redirect URI is where Google sends the user after consent.
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+export const GOOGLE_REDIRECT_URI =
+  import.meta.env.VITE_GOOGLE_REDIRECT_URI ?? "";
 
 // Manual on/off switch for the demo-account shortcut on the login page.
 // Flip VITE_SHOW_DEMO_ACCOUNT in .env (or .env.local for a personal-only
 // override) — set it to "false" before shipping to production.
-export const SHOW_DEMO_ACCOUNT = import.meta.env.VITE_SHOW_DEMO_ACCOUNT === 'true'
+export const SHOW_DEMO_ACCOUNT =
+  import.meta.env.VITE_SHOW_DEMO_ACCOUNT === "true";
 
 // The seeded accounts the demo box fills in. Env-backed rather than committed
 // source: the switch above was already configuration, so the credentials it
@@ -16,11 +24,11 @@ export const SHOW_DEMO_ACCOUNT = import.meta.env.VITE_SHOW_DEMO_ACCOUNT === 'tru
 // which is why LoginPage checks for an address before rendering the box.
 export const DEMO_ACCOUNTS = {
   customer: {
-    email: import.meta.env.VITE_DEMO_CUSTOMER_EMAIL ?? '',
-    password: import.meta.env.VITE_DEMO_CUSTOMER_PASSWORD ?? '',
+    email: import.meta.env.VITE_DEMO_CUSTOMER_EMAIL ?? "",
+    password: import.meta.env.VITE_DEMO_CUSTOMER_PASSWORD ?? "",
   },
   admin: {
-    email: import.meta.env.VITE_DEMO_ADMIN_EMAIL ?? '',
-    password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD ?? '',
+    email: import.meta.env.VITE_DEMO_ADMIN_EMAIL ?? "",
+    password: import.meta.env.VITE_DEMO_ADMIN_PASSWORD ?? "",
   },
-}
+};

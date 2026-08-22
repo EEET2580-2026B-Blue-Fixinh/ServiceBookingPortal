@@ -18,6 +18,9 @@ import com.fixinh.sbp.modules.reference.model.Province;
  */
 @Component
 public class RegionResolver {
+	public Region defaultRegion() {
+		return Region.SOUTH;
+	}
 
 	/**
 	 * @return the owning region, or empty when the code is not a province we publish. Callers

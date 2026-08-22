@@ -3,6 +3,7 @@ package com.fixinh.sbp.modules.customer.repository;
 import java.util.List;
 import java.util.Optional;
 
+import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
@@ -18,6 +19,9 @@ public interface CustomerRepository {
 
 	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
+
+	/** Writes the profile to its new shard, then removes the copy from the previous shard. */
+	Customer relocate(Customer customer, Region previousRegion);
 
 	/**
 	 * The profile for a signed-in caller, whose id came from their token. Also what the booking

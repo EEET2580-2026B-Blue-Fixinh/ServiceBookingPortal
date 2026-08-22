@@ -2,9 +2,13 @@ package com.fixinh.sbp.modules.auth.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.bson.types.ObjectId;
 import org.springframework.dao.DuplicateKeyException;
@@ -20,26 +24,31 @@ import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
+import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
 import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
+import com.fixinh.sbp.modules.auth.model.AuthProvider;
+import com.fixinh.sbp.modules.auth.model.AuthenticationIdentity;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
+import com.fixinh.sbp.modules.auth.service.GoogleOAuthService.GoogleUserInfo;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
-/** Registration and sign-in (API Documentation Sections 4.1 and 4.2). */
+/** Registration and sign-in (API Documentation Sections 4.1, 4.2, 4.3). */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthServiceImpl implements AuthExternalService, AuthInternalService {
 
 	private static final String TOKEN_TYPE_BEARER = "Bearer";
-	private static final String PROVIDER_PASSWORD = "PASSWORD";
 
 	/** Anything that looks like a phone number rather than an email address. */
 	private static final String DIGITS_ONLY = "\\d+";
@@ -51,6 +60,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 	private final AccountProfileReader profileReader;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider tokenProvider;
+	private final GoogleOAuthService googleOAuthService;
 
 	@Override
 	public RegisteredCustomerDto register(RegisterCommand command) {
@@ -94,7 +104,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				.passwordHash(passwordEncoder.encode(command.password()))
 				.accountStatus(AccountStatus.ACTIVE)
 				.accountRole(Role.CUSTOMER)
-				.authProviders(List.of(PROVIDER_PASSWORD))
+				.authProviders(new HashSet<>(Set.of(AuthProvider.PASSWORD)))
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 				.homeRegion(homeRegion)
 				.build();
@@ -152,6 +162,122 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 						credential.getAccountRole()));
 	}
 
+	@Override
+	public AuthTokenDto loginWithGoogle(GoogleLoginCommand command) {
+		// Exchange authorization code for verified Google user profile
+		GoogleUserInfo googleUser = googleOAuthService.verifyCodeAndGetUser(
+				command.authorizationCode(), command.redirectUri());
+		String email = googleUser.email().trim().toLowerCase(Locale.ROOT);
+		String displayName = googleUser.name() == null || googleUser.name().isBlank()
+				? email.substring(0, email.indexOf('@'))
+				: googleUser.name();
+
+		// Try to find existing account by email (check both regions)
+		Optional<UserCredential> existingCredential =
+				credentialRepository.findByGoogleSubject(googleUser.subject());
+		if (existingCredential.isEmpty()) {
+			existingCredential = credentialRepository.findByEmail(email);
+		}
+
+		boolean accountCreated = false;
+		boolean profileCompletionRequired = false;
+		boolean providerLinked = false;
+		UserCredential credential;
+
+		if (existingCredential.isPresent()) {
+			// Existing account - add GOOGLE provider if not already present
+			credential = existingCredential.get();
+			if (credential.getAccountStatus() == AccountStatus.DEACTIVATED) {
+				throw new ApiException(ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
+			}
+			Set<AuthProvider> currentProviders = credential.getAuthProviders() == null
+					? Collections.emptySet()
+					: credential.getAuthProviders();
+
+			boolean identityMissing = credential.getAuthenticationIdentities() == null
+					|| credential.getAuthenticationIdentities().stream()
+							.noneMatch(identity -> AuthProvider.GOOGLE == identity.getProvider());
+			if (!currentProviders.contains(AuthProvider.GOOGLE) || identityMissing) {
+				providerLinked = !currentProviders.contains(AuthProvider.GOOGLE);
+				Set<AuthProvider> providers = new HashSet<>(currentProviders);
+				providers.add(AuthProvider.GOOGLE);
+				credential.setAuthProviders(providers);
+				List<AuthenticationIdentity> identities = credential.getAuthenticationIdentities() == null
+						? new ArrayList<>()
+						: new ArrayList<>(credential.getAuthenticationIdentities());
+				identities.add(googleIdentity(googleUser.subject()));
+				credential.setAuthenticationIdentities(identities);
+				credentialRepository.save(credential);
+			}
+		} else {
+			// New account - create credential without password and without profile (no address yet)
+			accountCreated = true;
+			profileCompletionRequired = true;
+			
+			String userId = ObjectId.get().toHexString();
+			
+			credential = UserCredential.builder()
+					.id(userId)
+					.email(email)
+					.phoneNumber(null) // No phone number from Google
+					.passwordHash(null) // Google-only accounts have no password
+					.accountStatus(AccountStatus.ACTIVE)
+					.accountRole(Role.CUSTOMER)
+					.authProviders(new HashSet<>(Set.of(AuthProvider.GOOGLE)))
+					.authenticationIdentities(List.of(googleIdentity(googleUser.subject())))
+					.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+					// Address-less users remain in the configured default shard temporarily.
+					.homeRegion(regionResolver.defaultRegion())
+					.build();
+			
+			// Save credential first (profile will be created when user completes address)
+			try {
+				credentialRepository.save(credential);
+			} catch (DuplicateKeyException ex) {
+				// Race condition: another Google sign-in created the account first
+				throw new ApiException(ErrorCode.EMAIL_ALREADY_REGISTERED);
+			}
+			
+			// Create a minimal profile; address completion later resolves its shard (Req 3.1.U1-U2).
+			// If this fails, rollback the credential to maintain consistency
+			try {
+				customerService.createProfile(
+						new CustomerCreateCommand(userId, email, displayName, null));
+			} catch (Exception ex) {
+				// Rollback: delete the credential we just created
+				try {
+					credentialRepository.delete(credential);
+				} catch (Exception rollbackEx) {
+					log.error("Failed to rollback credential after profile creation failure for email: {}", email, rollbackEx);
+				}
+				
+				log.error("Failed to create customer profile for Google user: {}", email, ex);
+				throw new ApiException(ErrorCode.INTERNAL_ERROR);
+			}
+		}
+
+		// Issue JWT token
+		return new AuthTokenDto(
+				tokenProvider.generate(credential),
+				TOKEN_TYPE_BEARER,
+				tokenProvider.getAccessTokenTtlSeconds(),
+				new AuthTokenDto.AuthUserDto(
+						credential.getId(),
+						profileReader.fullNameOf(credential),
+						credential.getEmail(),
+						credential.getAccountRole()),
+				accountCreated,
+				profileCompletionRequired,
+				providerLinked);
+	}
+
+	private AuthenticationIdentity googleIdentity(String subject) {
+		return AuthenticationIdentity.builder()
+				.provider(AuthProvider.GOOGLE)
+				.externalAccountIdentifier(subject)
+				.linkedAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+				.build();
+	}
 	@Override
 	public List<UserCredential> listByRole(Role role) {
 		return credentialRepository.findByAccountRole(role);
