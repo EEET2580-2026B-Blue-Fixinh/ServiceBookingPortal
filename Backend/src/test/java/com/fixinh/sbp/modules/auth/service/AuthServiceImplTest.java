@@ -66,13 +66,15 @@ class AuthServiceImplTest {
 		credential.setAuthProviders(Set.of(AuthProvider.PASSWORD));
 		when(googleOAuth.verifyCodeAndGetUser("code", "http://localhost/login"))
 				.thenReturn(new GoogleOAuthService.GoogleUserInfo(
-						"user@example.com", "Test User", null));
+						"google-sub-1", "user@example.com", "Test User", null));
 		when(credentials.findByEmail("user@example.com")).thenReturn(Optional.of(credential));
 
 		service.loginWithGoogle(new GoogleLoginCommand("code", "http://localhost/login"));
 
 		assertEquals(Set.of(AuthProvider.PASSWORD, AuthProvider.GOOGLE),
 				credential.getAuthProviders());
+		assertEquals("google-sub-1", credential.getAuthenticationIdentities().getFirst()
+				.getExternalAccountIdentifier());
 		verify(credentials).save(credential);
 	}
 

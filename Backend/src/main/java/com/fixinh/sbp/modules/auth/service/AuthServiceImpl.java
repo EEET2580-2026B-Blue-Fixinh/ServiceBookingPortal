@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.auth.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +33,7 @@ import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
 import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
 import com.fixinh.sbp.modules.auth.model.AuthProvider;
+import com.fixinh.sbp.modules.auth.model.AuthenticationIdentity;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
 import com.fixinh.sbp.modules.auth.service.GoogleOAuthService.GoogleUserInfo;
@@ -173,7 +175,11 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		String email = googleUser.email().trim().toLowerCase(Locale.ROOT);
 
 		// Try to find existing account by email (check both regions)
-		Optional<UserCredential> existingCredential = credentialRepository.findByEmail(email);
+		Optional<UserCredential> existingCredential =
+				credentialRepository.findByGoogleSubject(googleUser.subject());
+		if (existingCredential.isEmpty()) {
+			existingCredential = credentialRepository.findByEmail(email);
+		}
 
 		boolean accountCreated = false;
 		boolean profileCompletionRequired = false;
@@ -189,10 +195,18 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 					? Collections.emptySet()
 					: credential.getAuthProviders();
 
-			if (!currentProviders.contains(AuthProvider.GOOGLE)) {
+			boolean identityMissing = credential.getAuthenticationIdentities() == null
+					|| credential.getAuthenticationIdentities().stream()
+							.noneMatch(identity -> AuthProvider.GOOGLE == identity.getProvider());
+			if (!currentProviders.contains(AuthProvider.GOOGLE) || identityMissing) {
 				Set<AuthProvider> providers = new HashSet<>(currentProviders);
 				providers.add(AuthProvider.GOOGLE);
 				credential.setAuthProviders(providers);
+				List<AuthenticationIdentity> identities = credential.getAuthenticationIdentities() == null
+						? new ArrayList<>()
+						: new ArrayList<>(credential.getAuthenticationIdentities());
+				identities.add(googleIdentity(googleUser.subject()));
+				credential.setAuthenticationIdentities(identities);
 				credentialRepository.save(credential);
 			}
 		} else {
@@ -210,6 +224,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 					.accountStatus(AccountStatus.ACTIVE)
 					.accountRole(Role.CUSTOMER)
 					.authProviders(new HashSet<>(Set.of(AuthProvider.GOOGLE)))
+					.authenticationIdentities(List.of(googleIdentity(googleUser.subject())))
 					.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 					// Google users start in south region until they add address (Req 3.2.U3)
 					.homeRegion(Region.SOUTH)
@@ -258,6 +273,14 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 						credential.getAccountRole()),
 				accountCreated,
 				profileCompletionRequired);
+	}
+
+	private AuthenticationIdentity googleIdentity(String subject) {
+		return AuthenticationIdentity.builder()
+				.provider(AuthProvider.GOOGLE)
+				.externalAccountIdentifier(subject)
+				.linkedAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
+				.build();
 	}
 @Override
 	public void completeProfile(String userId, CompleteProfileCommand command) {

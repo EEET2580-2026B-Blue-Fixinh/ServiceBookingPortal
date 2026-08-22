@@ -2,6 +2,8 @@ package com.fixinh.sbp.modules.auth.model;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import org.springframework.data.annotation.Id;
@@ -75,6 +77,10 @@ public class UserCredential {
 	/** How this account can sign in — PASSWORD, GOOGLE, or both (Appendix A). */
 	@Builder.Default
 	private Set<AuthProvider> authProviders = new HashSet<>();
+
+	/** Stable external identities; unlike email, the provider account id does not change. */
+	@Builder.Default
+	private List<AuthenticationIdentity> authenticationIdentities = new ArrayList<>();
 
 	private Instant registeredAt;
 

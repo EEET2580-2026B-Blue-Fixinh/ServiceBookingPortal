@@ -89,6 +89,16 @@ public class UserCredentialRepository {
 		return findOne(Criteria.where("phoneNumber").is(phoneNumber.trim()));
 	}
 
+	public Optional<UserCredential> findByGoogleSubject(String subject) {
+		if (subject == null || subject.isBlank()) {
+			return Optional.empty();
+		}
+		Criteria identity = Criteria.where("authenticationIdentities").elemMatch(
+				Criteria.where("provider").is("GOOGLE")
+						.and("externalAccountIdentifier").is(subject));
+		return findOne(identity);
+	}
+
 	public boolean existsByEmail(String email) {
 		return findByEmail(email).isPresent();
 	}

@@ -1,6 +1,7 @@
 package com.fixinh.sbp.modules.auth.service;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -75,9 +76,9 @@ public class GoogleOAuthService {
 
 			log.info("Google OAuth successful for email: {}", email);
 
-			return new GoogleUserInfo(email, name, picture);
+			return new GoogleUserInfo(payload.getSubject(), email, name, picture);
 
-		} catch (IOException e) {
+		} catch (IOException | GeneralSecurityException e) {
 			log.error("Failed to exchange Google authorization code", e);
 			throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
 		}
@@ -87,6 +88,7 @@ public class GoogleOAuthService {
 	 * Google user information extracted from verified ID token.
 	 */
 	public record GoogleUserInfo(
+			String subject,
 			String email,
 			String name,
 			String pictureUrl
