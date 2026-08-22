@@ -13,6 +13,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeToken
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
+import com.google.api.client.auth.oauth2.TokenResponseException;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 
@@ -62,11 +63,11 @@ public class GoogleOAuthService {
 					.build();
 			if (idToken == null || !verifier.verify(idToken)) {
 				log.warn("Google returned an invalid ID token");
-				throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
+				throw new ApiException(ErrorCode.OAUTH_CODE_INVALID);
 			}
 			GoogleIdToken.Payload payload = idToken.getPayload();
 			if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
-				throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
+				throw new ApiException(ErrorCode.OAUTH_CODE_INVALID);
 			}
 
 			// Extract user information
@@ -78,9 +79,15 @@ public class GoogleOAuthService {
 
 			return new GoogleUserInfo(payload.getSubject(), email, name, picture);
 
-		} catch (IOException | GeneralSecurityException e) {
+		} catch (TokenResponseException e) {
+			log.warn("Google rejected the authorization code");
+			throw new ApiException(ErrorCode.OAUTH_CODE_INVALID);
+		} catch (GeneralSecurityException e) {
+			log.warn("Google ID token verification failed", e);
+			throw new ApiException(ErrorCode.OAUTH_CODE_INVALID);
+		} catch (IOException e) {
 			log.error("Failed to exchange Google authorization code", e);
-			throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
+			throw new ApiException(ErrorCode.OAUTH_PROVIDER_UNAVAILABLE);
 		}
 	}
 

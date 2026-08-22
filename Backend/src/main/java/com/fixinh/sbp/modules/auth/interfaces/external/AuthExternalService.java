@@ -30,7 +30,8 @@ public interface AuthExternalService {
 	 * Authenticates via Google OAuth 2.0 (Req 3.2.U1-U3). Exchanges the authorization code for
 	 * a verified Google user profile, then either finds the existing account or creates a new one.
 	 *
-	 * @throws com.fixinh.sbp.common.exception.ApiException GOOGLE_OAUTH_FAILED or
+	 * @throws com.fixinh.sbp.common.exception.ApiException OAUTH_CODE_INVALID,
+	 *         OAUTH_PROVIDER_UNAVAILABLE or
 	 *         AUTH_ACCOUNT_DEACTIVATED
 	 */
 	AuthTokenDto loginWithGoogle(GoogleLoginCommand command);

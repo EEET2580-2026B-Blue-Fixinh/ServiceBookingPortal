@@ -1,6 +1,7 @@
 package com.fixinh.sbp.modules.auth.dto.external;
 
 import com.fixinh.sbp.common.security.Role;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * What a successful sign-in returns (API Documentation Sections 4.2, 4.3).
@@ -12,6 +13,7 @@ import com.fixinh.sbp.common.security.Role;
  * {@code profileCompletionRequired} is true when a Google user has no address yet and must
  * fill one in before booking (Req 3.2.U3).
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthTokenDto(
 		String accessToken,
 		String tokenType,
