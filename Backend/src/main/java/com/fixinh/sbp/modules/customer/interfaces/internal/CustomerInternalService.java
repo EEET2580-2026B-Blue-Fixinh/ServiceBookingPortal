@@ -4,8 +4,6 @@ import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
-import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
-import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
@@ -29,18 +27,12 @@ public interface CustomerInternalService {
 	Optional<Customer> findById(String id);
 
 	/**
-	 * Updates a customer's address (Req 3.2.U3: Google OAuth profile completion).
+	 * Completes the address needed to place a customer in a regional shard (Req 3.1.U1-U2).
 	 *
 	 * <p>Sets the customer's address and resolves their home region. Returns the resolved
 	 * region so the caller can update the credential's homeRegion accordingly.
 	 *
 	 * @return The home region determined by the address province
 	 */
-	com.fixinh.sbp.common.sharding.Region updateAddress(UpdateAddressCommand command);
-
-	/** Restores a profile when the matching credential relocation could not be completed. */
-	void restoreLocation(String customerId, Address address,
-			com.fixinh.sbp.common.sharding.Region region);
-
 	void completeAddress(String customerId, CompleteAddressCommand command);
 }

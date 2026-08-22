@@ -18,7 +18,6 @@ import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.modules.auth.interfaces.internal.CredentialRegionUpdater;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
-import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
@@ -56,10 +55,10 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 				// Truncated to the precision BSON can hold, so the value returned by register is
 				// the same value every later read reports.
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
-				// Google OAuth users start in south region until they complete profile (Req 3.2.U3)
+				// Address-less users stay in the default region until shard placement is known.
 				.homeRegion(command.address() != null 
 						? regionResolver.resolve(command.address().getProvinceCode()) 
-						: Region.SOUTH)
+						: regionResolver.defaultRegion())
 				.build();
 
 		return customerRepository.save(customer);
@@ -70,27 +69,7 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 		return customerRepository.findById(id);
 	}
 
-	@Override
-	public Region updateAddress(UpdateAddressCommand command) {
-		// Find the customer profile
-		Customer customer = customerRepository.findById(command.customerId())
-				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + command.customerId()));
-
-		// Resolve the home region from the new address
-		Region previousRegion = customer.getHomeRegion();
-		Region homeRegion = regionResolver.resolve(command.address().getProvinceCode());
-
-		// Update the customer profile with the new address and region
-		customer.setAddress(command.address());
-		customer.setHomeRegion(homeRegion);
-		customerRepository.relocate(customer, previousRegion);
-
-		// Return the region so the caller can update the credential
-		return homeRegion;
-	}
-
-	@Override
-	public void restoreLocation(String customerId, Address address, Region region) {
+	private void restoreLocation(String customerId, Address address, Region region) {
 		Customer customer = customerRepository.findById(customerId)
 				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
 		Region currentRegion = customer.getHomeRegion();
@@ -106,12 +85,17 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 		if (customer.getAddress() != null) {
 			throw new ApiException(ErrorCode.VALIDATION_FAILED);
 		}
+		String provinceCode = command.provinceCode().trim();
+		if (!regionResolver.isKnown(provinceCode)) {
+			throw new ApiException(ErrorCode.PROVINCE_CODE_INVALID);
+		}
 		Region previousRegion = customer.getHomeRegion();
+		Address previousAddress = customer.getAddress();
 		Address address = Address.builder()
 				.streetNumber(command.streetNumber().trim())
 				.streetName(command.streetName().trim())
 				.ward(command.ward().trim())
-				.provinceCode(command.provinceCode().trim())
+				.provinceCode(provinceCode)
 				.build();
 		Region targetRegion = regionResolver.resolve(address.getProvinceCode());
 		customer.setAddress(address);
@@ -119,12 +103,17 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 		customerRepository.relocate(customer, previousRegion);
 		try {
 			credentialRegionUpdater.relocateGoogleCredential(customerId, targetRegion);
+			shardDirectory.register(SubjectType.CUSTOMER, customerId, targetRegion);
 		}
 		catch (RuntimeException ex) {
-			restoreLocation(customerId, null, previousRegion);
+			try {
+				credentialRegionUpdater.relocateGoogleCredential(customerId, previousRegion);
+			}
+			finally {
+				restoreLocation(customerId, previousAddress, previousRegion);
+			}
 			throw ex;
 		}
-		shardDirectory.register(SubjectType.CUSTOMER, customerId, targetRegion);
 	}
 
 	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */

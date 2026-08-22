@@ -51,7 +51,7 @@ public class ShardedCustomerRepository implements CustomerRepository {
 			// Defensive fallback - should never happen with current code
 			home = customer.getAddress() != null
 					? regionResolver.resolve(customer.getAddress().getProvinceCode())
-					: Region.SOUTH;
+					: regionResolver.defaultRegion();
 			customer.setHomeRegion(home);
 		}
 
