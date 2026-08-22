@@ -51,6 +51,13 @@ public class SecurityConfig {
 						// cannot require the token registration has not issued yet (Req 3.1.S4).
 						.requestMatchers("/api/v1/reference/provinces").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info").permitAll()
+						// Req A.2.a: staff/customer must not reach admin resources.
+						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+						// /bookings/* is CUSTOMER-only (API Doc §2.4 authorization matrix); an
+						// admin token is authenticated but not permitted, so it gets 403.
+						.requestMatchers("/api/v1/bookings/**").hasRole("CUSTOMER")
+						.requestMatchers("/api/v1/notifications/**")
+						.hasAnyRole("CUSTOMER", "ADMIN")
 						// Everything else is closed by default, so an endpoint added later is
 						// protected unless it is deliberately opened.
 						.anyRequest().authenticated())

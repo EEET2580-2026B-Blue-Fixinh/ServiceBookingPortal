@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.customer.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -18,6 +19,13 @@ public interface CustomerRepository {
 	/** Persists to the shard the address province resolves to, and only that shard. */
 	Customer save(Customer customer);
 
-	/** The profile for a signed-in caller, whose id came from their token. */
+	/**
+	 * The profile for a signed-in caller, whose id came from their token. Also what the booking
+	 * module resolves a customer's home region through (see
+	 * {@code CustomerServiceImpl.findHomeRegion}), since a Mongo id carries no region either.
+	 */
 	Optional<Customer> findById(String id);
+
+	/** Every customer profile system-wide, for the admin customer list (Req 3.5.S2). */
+	List<Customer> findAll();
 }

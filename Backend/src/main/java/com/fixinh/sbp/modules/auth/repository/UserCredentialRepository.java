@@ -1,5 +1,7 @@
 package com.fixinh.sbp.modules.auth.repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -9,6 +11,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
+import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.ShardMongoConfig;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
@@ -73,17 +76,21 @@ public class UserCredentialRepository {
 		return findByPhoneNumber(phoneNumber).isPresent();
 	}
 
-	/**
-	 * Finds a credential by its ID across both stores.
-	 *
-	 * <p>Used when updating a credential's homeRegion after a Google user completes their
-	 * profile (Req 3.2.U3).
-	 */
+	/** Checks south, then north, since the id alone does not say which store owns it. */
 	public Optional<UserCredential> findById(String id) {
 		if (id == null || id.isBlank()) {
 			return Optional.empty();
 		}
-		return findOne(Criteria.where("_id").is(id.trim()));
+		return findOne(Criteria.where("_id").is(id));
+	}
+
+	/** Every credential with this discriminator, across both stores. */
+	public List<UserCredential> findByAccountRole(Role role) {
+		Query query = Query.query(Criteria.where("accountRole").is(role));
+		List<UserCredential> all = new ArrayList<>();
+		all.addAll(south.find(query, UserCredential.class));
+		all.addAll(north.find(query, UserCredential.class));
+		return all;
 	}
 
 	/**

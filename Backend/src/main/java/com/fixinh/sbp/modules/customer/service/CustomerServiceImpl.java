@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.customer.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -12,6 +13,7 @@ import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
@@ -19,8 +21,9 @@ import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
- * The customer module's own logic. Only what registration and sign-in need is implemented here;
- * profile read/update (GET and PUT /customers/me) belong to a separate task.
+ * The customer module's own logic. Only what registration, sign-in, and the admin customer
+ * screen need is implemented here; profile read/update (GET and PUT /customers/me) belong to a
+ * separate task.
  *
  * <p>Note what is no longer here: password hashing, and the email and phone uniqueness checks.
  * Both moved to the credential, which is one document in both stores — so uniqueness is enforced
@@ -28,7 +31,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class CustomerServiceImpl implements CustomerInternalService {
+public class CustomerServiceImpl implements CustomerInternalService, CustomerExternalService {
 
 	private final CustomerRepository customerRepository;
 	private final RegionResolver regionResolver;
@@ -74,6 +77,17 @@ public class CustomerServiceImpl implements CustomerInternalService {
 
 		// Return the region so the caller can update the credential
 		return homeRegion;
+	}
+
+	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */
+	@Override
+	public Optional<Region> findHomeRegion(String customerId) {
+		return customerRepository.findById(customerId).map(Customer::getHomeRegion);
+	}
+
+	@Override
+	public List<Customer> listAll() {
+		return customerRepository.findAll();
 	}
 
 	/** Stored lower-cased so the denormalised copy matches the credential it was taken from. */

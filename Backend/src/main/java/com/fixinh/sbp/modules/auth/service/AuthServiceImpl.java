@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.auth.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +26,7 @@ import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
+import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
 import com.fixinh.sbp.modules.auth.model.AuthProvider;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
@@ -42,7 +44,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuthServiceImpl implements AuthExternalService {
+public class AuthServiceImpl implements AuthExternalService, AuthInternalService {
 
 	private static final String TOKEN_TYPE_BEARER = "Bearer";
 
@@ -272,7 +274,22 @@ public class AuthServiceImpl implements AuthExternalService {
 		credentialRepository.save(credential);
 	}
 
-	
+
+	@Override
+	public List<UserCredential> listByRole(Role role) {
+		return credentialRepository.findByAccountRole(role);
+	}
+
+	@Override
+	public UserCredential setAccountStatus(String id, AccountStatus status) {
+		UserCredential credential = credentialRepository.findById(id)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+		credential.setAccountStatus(status);
+
+		return credentialRepository.save(credential);
+	}
+
 	/** One field takes both, so the server works out which was typed (see LoginCommand). */
 	private Optional<UserCredential> findCredential(String identifier) {
 		if (identifier == null || identifier.isBlank()) {
