@@ -2,6 +2,8 @@ package com.fixinh.sbp.modules.auth.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -102,7 +104,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				.passwordHash(passwordEncoder.encode(command.password()))
 				.accountStatus(AccountStatus.ACTIVE)
 				.accountRole(Role.CUSTOMER)
-				.authProviders(Set.of(AuthProvider.PASSWORD))
+				.authProviders(new HashSet<>(Set.of(AuthProvider.PASSWORD)))
 				.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 				.homeRegion(homeRegion)
 				.build();
@@ -176,9 +178,14 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		if (existingCredential.isPresent()) {
 			// Existing account - add GOOGLE provider if not already present
 			credential = existingCredential.get();
-			
-			if (!credential.getAuthProviders().contains(AuthProvider.GOOGLE)) {
-				credential.getAuthProviders().add(AuthProvider.GOOGLE);
+			Set<AuthProvider> currentProviders = credential.getAuthProviders() == null
+					? Collections.emptySet()
+					: credential.getAuthProviders();
+
+			if (!currentProviders.contains(AuthProvider.GOOGLE)) {
+				Set<AuthProvider> providers = new HashSet<>(currentProviders);
+				providers.add(AuthProvider.GOOGLE);
+				credential.setAuthProviders(providers);
 				credentialRepository.save(credential);
 			}
 		} else {
@@ -195,7 +202,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 					.passwordHash(null) // Google-only accounts have no password
 					.accountStatus(AccountStatus.ACTIVE)
 					.accountRole(Role.CUSTOMER)
-					.authProviders(Set.of(AuthProvider.GOOGLE))
+					.authProviders(new HashSet<>(Set.of(AuthProvider.GOOGLE)))
 					.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 					// Google users start in south region until they add address (Req 3.2.U3)
 					.homeRegion(Region.SOUTH)
