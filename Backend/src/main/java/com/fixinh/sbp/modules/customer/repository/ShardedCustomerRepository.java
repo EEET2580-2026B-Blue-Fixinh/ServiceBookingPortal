@@ -59,6 +59,26 @@ public class ShardedCustomerRepository implements CustomerRepository {
 	}
 
 	@Override
+	public Customer relocate(Customer customer, Region previousRegion) {
+		Region targetRegion = customer.getHomeRegion();
+		if (previousRegion == targetRegion) {
+			return save(customer);
+		}
+
+		MongoTemplate target = templateFor(targetRegion);
+		Customer saved = target.save(customer);
+		try {
+			templateFor(previousRegion).remove(
+					Query.query(Criteria.where("_id").is(customer.getId())), Customer.class);
+			return saved;
+		}
+		catch (RuntimeException ex) {
+			target.remove(Query.query(Criteria.where("_id").is(customer.getId())), Customer.class);
+			throw ex;
+		}
+	}
+
+	@Override
 	public Optional<Customer> findById(String id) {
 		if (id == null || id.isBlank()) {
 			return Optional.empty();

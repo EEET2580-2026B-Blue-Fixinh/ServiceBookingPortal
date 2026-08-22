@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
+import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 
 /**
@@ -35,4 +36,8 @@ public interface CustomerInternalService {
 	 * @return The home region determined by the address province
 	 */
 	com.fixinh.sbp.common.sharding.Region updateAddress(UpdateAddressCommand command);
+
+	/** Restores a profile when the matching credential relocation could not be completed. */
+	void restoreLocation(String customerId, Address address,
+			com.fixinh.sbp.common.sharding.Region region);
 }

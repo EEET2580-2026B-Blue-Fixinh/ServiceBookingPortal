@@ -54,6 +54,27 @@ public class UserCredentialRepository {
 		return templateFor(credential.getHomeRegion()).save(credential);
 	}
 
+	/** Writes the credential to its new shard, then removes the copy from the previous shard. */
+	public UserCredential relocate(UserCredential credential, Region previousRegion) {
+		Region targetRegion = credential.getHomeRegion();
+		if (previousRegion == targetRegion) {
+			return save(credential);
+		}
+
+		MongoTemplate target = templateFor(targetRegion);
+		UserCredential saved = target.save(credential);
+		try {
+			templateFor(previousRegion).remove(
+					Query.query(Criteria.where("_id").is(credential.getId())), UserCredential.class);
+			return saved;
+		}
+		catch (RuntimeException ex) {
+			target.remove(
+					Query.query(Criteria.where("_id").is(credential.getId())), UserCredential.class);
+			throw ex;
+		}
+	}
+
 	public Optional<UserCredential> findByEmail(String email) {
 		if (email == null || email.isBlank()) {
 			return Optional.empty();

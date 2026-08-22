@@ -15,6 +15,7 @@ import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
+import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
 
@@ -68,15 +69,26 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + command.customerId()));
 
 		// Resolve the home region from the new address
+		Region previousRegion = customer.getHomeRegion();
 		Region homeRegion = regionResolver.resolve(command.address().getProvinceCode());
 
 		// Update the customer profile with the new address and region
 		customer.setAddress(command.address());
 		customer.setHomeRegion(homeRegion);
-		customerRepository.save(customer);
+		customerRepository.relocate(customer, previousRegion);
 
 		// Return the region so the caller can update the credential
 		return homeRegion;
+	}
+
+	@Override
+	public void restoreLocation(String customerId, Address address, Region region) {
+		Customer customer = customerRepository.findById(customerId)
+				.orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
+		Region currentRegion = customer.getHomeRegion();
+		customer.setAddress(address);
+		customer.setHomeRegion(region);
+		customerRepository.relocate(customer, currentRegion);
 	}
 
 	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */

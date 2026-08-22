@@ -21,6 +21,8 @@ import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.security.jwt.JwtTokenProvider;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
+import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
+import com.fixinh.sbp.common.sharding.SubjectType;
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
 import com.fixinh.sbp.modules.auth.dto.internal.CompleteProfileCommand;
@@ -61,6 +63,7 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider tokenProvider;
 	private final GoogleOAuthService googleOAuthService;
+	private final ShardDirectoryRepository shardDirectory;
 
 	@Override
 	public RegisteredCustomerDto register(RegisterCommand command) {
@@ -269,16 +272,29 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				.provinceCode(command.provinceCode().trim())
 				.build();
 
-		// Update customer profile with address and get resolved region
+		Customer customer = customerService.findById(userId)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+		Address previousAddress = customer.getAddress();
+		Region previousCustomerRegion = customer.getHomeRegion();
+
+		UserCredential credential = credentialRepository.findById(userId)
+				.orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
+		Region previousCredentialRegion = credential.getHomeRegion();
+
 		Region homeRegion = customerService.updateAddress(
 				new UpdateAddressCommand(userId, address));
 
-		// Update credential's homeRegion to match
-		UserCredential credential = credentialRepository.findById(userId)
-				.orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
-		
-		credential.setHomeRegion(homeRegion);
-		credentialRepository.save(credential);
+		try {
+			credential.setHomeRegion(homeRegion);
+			credentialRepository.relocate(credential, previousCredentialRegion);
+		}
+		catch (RuntimeException ex) {
+			customerService.restoreLocation(
+					userId, previousAddress, previousCustomerRegion);
+			throw ex;
+		}
+
+		shardDirectory.register(SubjectType.CUSTOMER, userId, homeRegion);
 	}
 
 
