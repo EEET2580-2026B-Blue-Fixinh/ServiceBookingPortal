@@ -168,7 +168,8 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 	@Override
 	public AuthTokenDto loginWithGoogle(GoogleLoginCommand command) {
 		// Exchange authorization code for verified Google user profile
-		GoogleUserInfo googleUser = googleOAuthService.verifyCodeAndGetUser(command.code());
+		GoogleUserInfo googleUser = googleOAuthService.verifyCodeAndGetUser(
+				command.authorizationCode(), command.redirectUri());
 		String email = googleUser.email().trim().toLowerCase(Locale.ROOT);
 
 		// Try to find existing account by email (check both regions)
@@ -181,6 +182,9 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		if (existingCredential.isPresent()) {
 			// Existing account - add GOOGLE provider if not already present
 			credential = existingCredential.get();
+			if (credential.getAccountStatus() == AccountStatus.DEACTIVATED) {
+				throw new ApiException(ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
+			}
 			Set<AuthProvider> currentProviders = credential.getAuthProviders() == null
 					? Collections.emptySet()
 					: credential.getAuthProviders();

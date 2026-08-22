@@ -12,5 +12,6 @@ import jakarta.validation.constraints.NotBlank;
 public record GoogleLoginCommand(
 		/** The authorization code Google redirected the user with. */
 		@NotBlank(message = "Authorization code is required")
-		String code
+		String authorizationCode,
+		@NotBlank(message = "Redirect URI is required") String redirectUri
 ) {}

@@ -1,6 +1,7 @@
 package com.fixinh.sbp.modules.auth.service;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 
@@ -9,7 +10,7 @@ import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken.Payload;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
@@ -38,26 +39,32 @@ public class GoogleOAuthService {
 	 * @return Verified payload containing email, name, and picture.
 	 * @throws ApiException GOOGLE_OAUTH_FAILED if the code is invalid or verification fails.
 	 */
-	public GoogleUserInfo verifyCodeAndGetUser(String code) {
+	public GoogleUserInfo verifyCodeAndGetUser(String code, String redirectUri) {
 		try {
+			NetHttpTransport transport = new NetHttpTransport();
+			GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
 			// Exchange authorization code for tokens
 			GoogleTokenResponse tokenResponse = new GoogleAuthorizationCodeTokenRequest(
-					new NetHttpTransport(),
-					GsonFactory.getDefaultInstance(),
+					transport,
+					jsonFactory,
 					"https://oauth2.googleapis.com/token",
 					sbpProperties.getOauth().getGoogle().getClientId(),
 					sbpProperties.getOauth().getGoogle().getClientSecret(),
 					code,
-					sbpProperties.getOauth().getGoogle().getRedirectUri()
+					redirectUri
 			).execute();
 
 			// Verify ID token
 			GoogleIdToken idToken = tokenResponse.parseIdToken();
+			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory)
+					.setAudience(List.of(sbpProperties.getOauth().getGoogle().getClientId()))
+					.build();
+			if (idToken == null || !verifier.verify(idToken)) {
+				log.warn("Google returned an invalid ID token");
+				throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
+			}
 			GoogleIdToken.Payload payload = idToken.getPayload();
-
-			// Verify token issuer and audience
-			if (!verifyIdToken(payload)) {
-				log.error("Google ID token verification failed for code: {}", code);
+			if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
 				throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
 			}
 
@@ -74,24 +81,6 @@ public class GoogleOAuthService {
 			log.error("Failed to exchange Google authorization code", e);
 			throw new ApiException(ErrorCode.GOOGLE_OAUTH_FAILED);
 		}
-	}
-
-	/**
-	 * Verifies the ID token's issuer and audience.
-	 */
-	private boolean verifyIdToken(Payload payload) {
-		String clientId = sbpProperties.getOauth().getGoogle().getClientId();
-		
-		// Check issuer (should be accounts.google.com or https://accounts.google.com)
-		String issuer = (String) payload.get("iss");
-		boolean validIssuer = "accounts.google.com".equals(issuer) 
-				|| "https://accounts.google.com".equals(issuer);
-		
-		// Check audience (should match our client ID)
-		boolean validAudience = payload.getAudience().equals(clientId)
-				|| payload.getAudienceAsList().contains(clientId);
-		
-		return validIssuer && validAudience;
 	}
 
 	/**

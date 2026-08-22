@@ -64,12 +64,12 @@ class AuthServiceImplTest {
 	void googleLoginCanLinkAnImmutablePasswordProviderSet() {
 		UserCredential credential = credential(Region.SOUTH);
 		credential.setAuthProviders(Set.of(AuthProvider.PASSWORD));
-		when(googleOAuth.verifyCodeAndGetUser("code"))
+		when(googleOAuth.verifyCodeAndGetUser("code", "http://localhost/login"))
 				.thenReturn(new GoogleOAuthService.GoogleUserInfo(
 						"user@example.com", "Test User", null));
 		when(credentials.findByEmail("user@example.com")).thenReturn(Optional.of(credential));
 
-		service.loginWithGoogle(new GoogleLoginCommand("code"));
+		service.loginWithGoogle(new GoogleLoginCommand("code", "http://localhost/login"));
 
 		assertEquals(Set.of(AuthProvider.PASSWORD, AuthProvider.GOOGLE),
 				credential.getAuthProviders());
