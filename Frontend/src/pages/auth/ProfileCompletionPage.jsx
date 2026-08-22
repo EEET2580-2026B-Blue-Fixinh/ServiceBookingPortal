@@ -6,7 +6,7 @@ import { AuthIntro } from "../../components/auth/AuthIntro";
 import { SelectField } from "../../components/shared/form/SelectField/SelectField";
 import { useVietnamAddress } from "../../hooks/useVietnamAddress";
 import { useAuth } from "../../context/AuthContext";
-import { completeProfile } from "../../services/api/endpoints/authEndpoints";
+import { completeAddress } from "../../services/api/endpoints/customerEndpoints";
 
 /**
  * Profile completion for new Google Sign-In users (Req 3.2.U3).
@@ -78,7 +78,7 @@ export function ProfileCompletionPage() {
     setFormError("");
 
     try {
-      await completeProfile({
+      await completeAddress({
         streetNumber: form.streetNumber.trim(),
         streetName: form.streetName.trim(),
         ward: ward,

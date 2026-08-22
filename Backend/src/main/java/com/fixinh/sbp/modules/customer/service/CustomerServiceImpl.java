@@ -11,6 +11,12 @@ import org.springframework.stereotype.Service;
 import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
+import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
+import com.fixinh.sbp.common.sharding.SubjectType;
+import com.fixinh.sbp.common.exception.ApiException;
+import com.fixinh.sbp.common.exception.ErrorCode;
+import com.fixinh.sbp.modules.auth.interfaces.internal.CredentialRegionUpdater;
+import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
@@ -36,6 +42,8 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 
 	private final CustomerRepository customerRepository;
 	private final RegionResolver regionResolver;
+	private final CredentialRegionUpdater credentialRegionUpdater;
+	private final ShardDirectoryRepository shardDirectory;
 
 	@Override
 	public Customer createProfile(CustomerCreateCommand command) {
@@ -89,6 +97,34 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 		customer.setAddress(address);
 		customer.setHomeRegion(region);
 		customerRepository.relocate(customer, currentRegion);
+	}
+
+	@Override
+	public void completeAddress(String customerId, CompleteAddressCommand command) {
+		Customer customer = customerRepository.findById(customerId)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+		if (customer.getAddress() != null) {
+			throw new ApiException(ErrorCode.VALIDATION_FAILED);
+		}
+		Region previousRegion = customer.getHomeRegion();
+		Address address = Address.builder()
+				.streetNumber(command.streetNumber().trim())
+				.streetName(command.streetName().trim())
+				.ward(command.ward().trim())
+				.provinceCode(command.provinceCode().trim())
+				.build();
+		Region targetRegion = regionResolver.resolve(address.getProvinceCode());
+		customer.setAddress(address);
+		customer.setHomeRegion(targetRegion);
+		customerRepository.relocate(customer, previousRegion);
+		try {
+			credentialRegionUpdater.relocateGoogleCredential(customerId, targetRegion);
+		}
+		catch (RuntimeException ex) {
+			restoreLocation(customerId, null, previousRegion);
+			throw ex;
+		}
+		shardDirectory.register(SubjectType.CUSTOMER, customerId, targetRegion);
 	}
 
 	/** What the booking module resolves a customer's home region through — see Req 3.1.U1. */

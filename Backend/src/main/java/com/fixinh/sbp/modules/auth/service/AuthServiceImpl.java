@@ -22,11 +22,8 @@ import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.security.jwt.JwtTokenProvider;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
-import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
-import com.fixinh.sbp.common.sharding.SubjectType;
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
-import com.fixinh.sbp.modules.auth.dto.internal.CompleteProfileCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
@@ -38,7 +35,6 @@ import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.auth.repository.UserCredentialRepository;
 import com.fixinh.sbp.modules.auth.service.GoogleOAuthService.GoogleUserInfo;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
-import com.fixinh.sbp.modules.customer.dto.internal.UpdateAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -65,7 +61,6 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider tokenProvider;
 	private final GoogleOAuthService googleOAuthService;
-	private final ShardDirectoryRepository shardDirectory;
 
 	@Override
 	public RegisteredCustomerDto register(RegisterCommand command) {
@@ -282,49 +277,6 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				.linkedAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
 				.build();
 	}
-@Override
-	public void completeProfile(String userId, CompleteProfileCommand command) {
-		// Validate province code exists
-		try {
-			regionResolver.resolve(command.provinceCode());
-		} catch (Exception e) {
-			throw new ApiException(ErrorCode.PROVINCE_CODE_INVALID);
-		}
-
-		// Build address from command
-		Address address = Address.builder()
-				.streetNumber(command.streetNumber().trim())
-				.streetName(command.streetName().trim())
-				.ward(command.ward().trim())
-				.provinceCode(command.provinceCode().trim())
-				.build();
-
-		Customer customer = customerService.findById(userId)
-				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
-		Address previousAddress = customer.getAddress();
-		Region previousCustomerRegion = customer.getHomeRegion();
-
-		UserCredential credential = credentialRepository.findById(userId)
-				.orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
-		Region previousCredentialRegion = credential.getHomeRegion();
-
-		Region homeRegion = customerService.updateAddress(
-				new UpdateAddressCommand(userId, address));
-
-		try {
-			credential.setHomeRegion(homeRegion);
-			credentialRepository.relocate(credential, previousCredentialRegion);
-		}
-		catch (RuntimeException ex) {
-			customerService.restoreLocation(
-					userId, previousAddress, previousCustomerRegion);
-			throw ex;
-		}
-
-		shardDirectory.register(SubjectType.CUSTOMER, userId, homeRegion);
-	}
-
-
 	@Override
 	public List<UserCredential> listByRole(Role role) {
 		return credentialRepository.findByAccountRole(role);

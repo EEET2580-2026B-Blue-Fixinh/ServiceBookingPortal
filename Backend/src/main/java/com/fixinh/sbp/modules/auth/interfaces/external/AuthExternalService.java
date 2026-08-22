@@ -2,7 +2,6 @@ package com.fixinh.sbp.modules.auth.interfaces.external;
 
 import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
-import com.fixinh.sbp.modules.auth.dto.internal.CompleteProfileCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
@@ -46,5 +45,4 @@ public interface AuthExternalService {
 	 * @throws com.fixinh.sbp.common.exception.ApiException VALIDATION_FAILED or
 	 *         PROVINCE_CODE_INVALID
 	 */
-	void completeProfile(String userId, CompleteProfileCommand command);
 }
