@@ -173,6 +173,13 @@
   font-size: 14.5px;
 }
 
+.auth-signed-in-status,
+.auth-sign-out {
+  display: block;
+  margin: 1rem auto 0;
+  text-align: center;
+}
+
 .auth-section-label {
   margin: 22px 0 14px;
   padding-top: 18px;
@@ -389,7 +396,7 @@
 
 .auth-divider::before,
 .auth-divider::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
   background: var(--auth-border);
