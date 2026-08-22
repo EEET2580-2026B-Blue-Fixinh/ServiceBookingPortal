@@ -4,14 +4,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -23,10 +32,17 @@ import com.fixinh.sbp.common.config.SbpProperties;
 import com.fixinh.sbp.common.email.EmailClient;
 import com.fixinh.sbp.common.email.EmailDeliveryException;
 import com.fixinh.sbp.common.email.EmailMessage;
+import com.fixinh.sbp.common.exception.ApiException;
+import com.fixinh.sbp.common.exception.ErrorCode;
+import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
 import com.fixinh.sbp.common.sharding.SubjectType;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
+import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
+import com.fixinh.sbp.modules.notification.dto.external.NotificationListDto;
+import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 import com.fixinh.sbp.modules.notification.model.DeliveryChannel;
@@ -45,6 +61,7 @@ import com.fixinh.sbp.modules.notification.repository.NotificationRepository;
  */
 class NotificationServiceImplTest {
 
+	private static final String CUSTOMER_ID = "66f1a2b3c4d5e6f708192a3b";
 	private static final String PASSWORD = "Tmp!Passw0rd";
 
 	private static final StaffWelcomeEmailCommand COMMAND = new StaffWelcomeEmailCommand(
@@ -54,6 +71,7 @@ class NotificationServiceImplTest {
 
 	private EmailClient emailClient;
 	private ShardDirectoryRepository shardDirectory;
+	private NotificationRepository repository;
 	private NotificationServiceImpl service;
 
 	@BeforeEach
@@ -66,7 +84,12 @@ class NotificationServiceImplTest {
 		when(shardDirectory.register(SubjectType.STAFF, "STF-001", Region.SOUTH))
 				.thenReturn(Region.SOUTH);
 
-		NotificationRepository repository = mock(NotificationRepository.class);
+		// The customer's store is already known, so regionForCustomer takes the directory hit
+		// and never reaches for a profile. Keeps the read-path tests about the service.
+		when(shardDirectory.findRegion(SubjectType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(Optional.of(Region.SOUTH));
+
+		repository = mock(NotificationRepository.class);
 		when(repository.save(any())).thenAnswer(invocation -> {
 			Notification given = invocation.getArgument(0);
 			if (given.getId() == null) {
@@ -83,7 +106,10 @@ class NotificationServiceImplTest {
 
 		service = new NotificationServiceImpl(
 				new StaffWelcomeEmailComposer(properties),
-				new NotificationRegionResolver(shardDirectory, new RegionResolver()),
+				// A staff welcome email routes by branch province, never by a customer profile,
+				// so the customer service is a bare mock here -- unused by this path on purpose.
+				new NotificationRegionResolver(
+						shardDirectory, new RegionResolver(), mock(CustomerExternalService.class)),
 				repository,
 				emailClient);
 	}
@@ -197,6 +223,216 @@ class NotificationServiceImplTest {
 		assertTrue(COMMAND.toString().contains("STF-001"), "but must stay useful for debugging");
 	}
 
+	// --- §9.1: the list -------------------------------------------------------------------
+
+	@Test
+	void reportsTheCallersTotalUnreadNotThePagesOwn() {
+		when(repository.count(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID, false))
+				.thenReturn(37L);
+		when(repository.count(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID, true))
+				.thenReturn(4L);
+		when(repository.findForRecipient(any(), any(), anyString(), anyBoolean(), anyInt(), anyInt()))
+				.thenReturn(List.of(inApp("NOTIF-1", false)));
+
+		NotificationListDto result = service.list(CUSTOMER_ID, Role.CUSTOMER, null, 1, 20);
+
+		assertEquals(4L, result.unreadCount(),
+				"the bell badge is the caller's total, so it must not shrink as they page forward");
+		assertEquals(37L, result.page().totalElements());
+		assertEquals(2, result.page().totalPages());
+		assertEquals(1, result.page().number());
+	}
+
+	@Test
+	void asksForTheCountOnceWhenOnlyUnreadWasRequested() {
+		when(repository.count(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID, true))
+				.thenReturn(4L);
+		when(repository.findForRecipient(any(), any(), anyString(), anyBoolean(), anyInt(), anyInt()))
+				.thenReturn(List.of());
+
+		NotificationListDto result = service.list(CUSTOMER_ID, Role.CUSTOMER, true, 0, 20);
+
+		// Filtered total and unread total are the same number here, so one count answers both.
+		assertEquals(4L, result.unreadCount());
+		assertEquals(4L, result.page().totalElements());
+		verify(repository, never()).count(any(), any(), anyString(), eq(false));
+	}
+
+	@Test
+	void appliesSection26DefaultsAndCap() {
+		when(repository.findForRecipient(any(), any(), anyString(), anyBoolean(), anyInt(), anyInt()))
+				.thenReturn(List.of());
+
+		assertEquals(20, service.list(CUSTOMER_ID, Role.CUSTOMER, null, null, null).page().size(),
+				"no size supplied means 20");
+		assertEquals(100, service.list(CUSTOMER_ID, Role.CUSTOMER, null, null, 500).page().size(),
+				"a caller must not be able to ask for an unbounded page");
+		assertEquals(0, service.list(CUSTOMER_ID, Role.CUSTOMER, null, -3, null).page().number(),
+				"a negative page is a client bug, not a reason to fail the bell menu");
+	}
+
+	@Test
+	void mapsOnlyTheSixFieldsSection91Publishes() {
+		Notification stored = inApp("NOTIF-9", false);
+		stored.setBookingRef("ORD-2026-1024");
+		when(repository.findForRecipient(any(), any(), anyString(), anyBoolean(), anyInt(), anyInt()))
+				.thenReturn(List.of(stored));
+
+		NotificationDto item = service.list(CUSTOMER_ID, Role.CUSTOMER, null, 0, 20).items().get(0);
+
+		assertEquals("NOTIF-9", item.notificationId());
+		assertEquals(NotificationType.BOOKING_SCHEDULED, item.type());
+		assertEquals("ORD-2026-1024", item.bookingRef());
+		assertFalse(item.readStatus());
+		assertNotNull(item.createdAt());
+	}
+
+	// --- §9.2: marking read --------------------------------------------------------------
+
+	@Test
+	void markingSomebodyElsesNotificationIsA404NotA403() {
+		// The repository found nothing, because ownership is part of its query. The service
+		// cannot tell "unknown" from "not yours" and §9.2 requires that it does not try.
+		when(repository.markRead(any(), any(), anyString(), anyString())).thenReturn(false);
+
+		ApiException thrown = assertThrows(ApiException.class,
+				() -> service.markRead(CUSTOMER_ID, Role.CUSTOMER, "SOMEONE-ELSES"));
+
+		assertSame(ErrorCode.NOTIFICATION_NOT_FOUND, thrown.getErrorCode());
+		assertEquals(404, ErrorCode.NOTIFICATION_NOT_FOUND.getHttpStatus().value(),
+				"§9.2 departs from §2.4's 403 on purpose, so ids cannot be probed for existence");
+	}
+
+	@Test
+	void markingTheSameNotificationTwiceSucceedsBothTimes() {
+		// Read status is not part of the repository's match, so an already-read notification
+		// still matches and still reports true.
+		when(repository.markRead(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID, "NOTIF-1"))
+				.thenReturn(true);
+
+		service.markRead(CUSTOMER_ID, Role.CUSTOMER, "NOTIF-1");
+		service.markRead(CUSTOMER_ID, Role.CUSTOMER, "NOTIF-1");
+
+		verify(repository, times(2))
+				.markRead(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID, "NOTIF-1");
+	}
+
+	@Test
+	void markAllReadSucceedsWithNothingToMark() {
+		when(repository.markAllRead(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(0L);
+
+		service.markAllRead(CUSTOMER_ID, Role.CUSTOMER);
+
+		// An empty bell is not a failed request; the control must not error on a second press.
+		verify(repository).markAllRead(Region.SOUTH, RecipientType.CUSTOMER, CUSTOMER_ID);
+	}
+
+	// --- §2.4: an administrator is entitled to ask, and has none -----------------------------
+
+	@Test
+	void anAdministratorGetsAnEmptyPageRatherThanAFault() {
+		NotificationListDto result = service.list("ADMIN-1", Role.ADMIN, null, 0, 20);
+
+		assertTrue(result.items().isEmpty());
+		assertEquals(0L, result.unreadCount());
+		assertEquals(0, result.page().totalPages());
+		assertEquals(20, result.page().size(), "the page still echoes what was asked for");
+
+		// Nothing is looked up: RecipientType has no value for an administrator, so there is
+		// no store to look in and no question for the repository to answer.
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void anAdministratorMarkingAnythingReadGetsThe404() {
+		assertThrows(ApiException.class, () -> service.markRead("ADMIN-1", Role.ADMIN, "NOTIF-1"));
+
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void anAdministratorMarkingAllReadIsAQuietNoOp() {
+		service.markAllRead("ADMIN-1", Role.ADMIN);
+
+		assertEquals(0L, service.unreadCount("ADMIN-1", Role.ADMIN));
+		verifyNoInteractions(repository);
+	}
+
+	// --- Req 3.3.U2: raising one ------------------------------------------------------------
+
+	@Test
+	void raisesACustomerNotificationIntoTheirOwnStore() {
+		NotificationDto raised = service.raise(NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_SCHEDULED, "Scheduled.", "ORD-2026-1024"));
+
+		Notification written = saves.get(0);
+		assertEquals(Region.SOUTH, written.getHomeRegion(),
+				"a southern customer's notification belongs in the southern store");
+		assertEquals(RecipientType.CUSTOMER, written.getRecipientType());
+		assertEquals(CUSTOMER_ID, written.getRecipientIdentifier());
+		assertEquals("ORD-2026-1024", written.getBookingRef());
+		assertFalse(written.isReadStatus(), "a new notification has not been read");
+		assertNotNull(raised.notificationId(), "5.1 pushes this without reading anything back");
+	}
+
+	@Test
+	void anInAppNotificationIsDeliveredByBeingWritten() {
+		service.raise(NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_CONFIRMED, "Confirmed.", "ORD-1"));
+
+		Notification written = saves.get(0);
+		// There is no provider to accept it and nothing for the sweeper to retry.
+		assertEquals(DeliveryStatus.SENT, written.getDeliveryStatus());
+		assertNotNull(written.getSentAt());
+		assertFalse(written.isAwaitingDelivery());
+	}
+
+	@Test
+	void everythingRaisedThisWayIsDeliverableOrDeliveredAlready() {
+		service.raise(NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_CONFIRMED, "Confirmed.", "ORD-1"));
+
+		Notification written = saves.get(0);
+		assertEquals(DeliveryChannel.IN_APP, written.getDeliveryChannel());
+		assertEquals(DeliveryStatus.SENT, written.getDeliveryStatus());
+		assertNotNull(written.getSentAt());
+
+		// The point of the restriction. A row the sweeper picks up but cannot resend gets
+		// abandoned on the first pass, at ERROR -- and raise() had been able to create one.
+		assertFalse(written.isAwaitingDelivery(),
+				"nothing raised this way may ever reach the retry sweeper");
+		assertNull(written.getUndeliveredBody());
+	}
+
+	@Test
+	void raisingTwiceRecordsTwoNotifications() {
+		NotificationCreateCommand command = NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_SCHEDULED, "Scheduled.", "ORD-1");
+
+		service.raise(command);
+		service.raise(command);
+
+		// Not idempotent, deliberately. §11.7 gives SMP an eventId so Integration can filter
+		// replays; this module cannot tell one from a genuine second change to the booking.
+		assertEquals(2, saves.size());
+	}
+
+	/** An in-app notification for the customer under test, as the repository would return it. */
+	private Notification inApp(String id, boolean read) {
+		Notification notification = new Notification();
+		notification.setId(id);
+		notification.setRecipientType(RecipientType.CUSTOMER);
+		notification.setRecipientIdentifier(CUSTOMER_ID);
+		notification.setType(NotificationType.BOOKING_SCHEDULED);
+		notification.setDeliveryChannel(DeliveryChannel.IN_APP);
+		notification.setMessage("Your order is scheduled.");
+		notification.setReadStatus(read);
+		notification.setCreatedAt(Instant.parse("2026-08-11T03:20:00Z"));
+		notification.setHomeRegion(Region.SOUTH);
+		return notification;
+	}
+
 	/** A shallow copy, so later mutations of the same instance do not rewrite history. */
 	private Notification copyOf(Notification source) {
 		Notification copy = new Notification();
@@ -207,7 +443,9 @@ class NotificationServiceImplTest {
 		copy.setType(source.getType());
 		copy.setDeliveryChannel(source.getDeliveryChannel());
 		copy.setMessage(source.getMessage());
+		copy.setBookingRef(source.getBookingRef());
 		copy.setCreatedAt(source.getCreatedAt());
+		copy.setReadStatus(source.isReadStatus());
 		copy.setDeliveryStatus(source.getDeliveryStatus());
 		copy.setSentAt(source.getSentAt());
 		copy.setAttemptCount(source.getAttemptCount());

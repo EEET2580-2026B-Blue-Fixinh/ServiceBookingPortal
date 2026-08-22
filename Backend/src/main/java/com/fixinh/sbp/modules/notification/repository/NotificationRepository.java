@@ -3,7 +3,9 @@ package com.fixinh.sbp.modules.notification.repository;
 import java.util.List;
 import java.util.Optional;
 
+import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.modules.notification.model.Notification;
+import com.fixinh.sbp.modules.notification.model.RecipientType;
 
 /**
  * Notification access, spanning both regional stores.
@@ -45,4 +47,44 @@ public interface NotificationRepository {
 	 * @param limit how many to take <b>from each store</b>, so at most twice this comes back
 	 */
 	List<Notification> findOutstandingEmails(int limit);
+
+	// --- The recipient's own history -----------------------------------------
+	// Every method below names a region, unlike the three above. Those are asked without a
+	// recipient in hand and so have to try both stores; these are asked on behalf of a
+	// signed-in caller whose store the service has already resolved. Passing it means one
+	// store is read instead of two, and another region's rows cannot come back by accident.
+
+	/**
+	 * One page of a recipient's notifications, newest first.
+	 *
+	 * @param unreadOnly restricts to {@code readStatus: false}, which is what the bell menu
+	 *        asks for
+	 * @param page zero-based, already normalised by the caller
+	 * @param size already normalised and capped by the caller
+	 */
+	List<Notification> findForRecipient(Region region, RecipientType recipientType,
+			String recipientIdentifier, boolean unreadOnly, int page, int size);
+
+	/**
+	 * How many notifications the same filter matches.
+	 */
+	long count(Region region, RecipientType recipientType, String recipientIdentifier,
+			boolean unreadOnly);
+
+	/**
+	 * Marks one notification read, if it belongs to this recipient (§9.2).
+	 *
+	 * @return whether a notification matched. False means unknown or someone else's, and the
+	 *         caller must not try to tell those apart
+	 */
+	boolean markRead(Region region, RecipientType recipientType, String recipientIdentifier,
+			String notificationId);
+
+	/**
+	 * Marks every unread notification for this recipient read (§9.2's note), in one write.
+	 *
+	 * @return how many were changed. Zero is an ordinary outcome — everything was already
+	 *         read — and not an error
+	 */
+	long markAllRead(Region region, RecipientType recipientType, String recipientIdentifier);
 }

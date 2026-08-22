@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.Optional;
 
@@ -21,6 +22,7 @@ import com.fixinh.sbp.common.sharding.RegionResolver;
 import com.fixinh.sbp.common.sharding.ShardDirectoryRepository;
 import com.fixinh.sbp.common.sharding.SubjectType;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
+import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 
 /**
  * The directory is mocked; {@link RegionResolver} is not.
@@ -33,14 +35,18 @@ import com.fixinh.sbp.modules.notification.model.RecipientType;
 class NotificationRegionResolverTest {
 
 	private static final String STAFF_ID = "STF-001";
+	private static final String CUSTOMER_ID = "66f1a2b3c4d5e6f708192a3b";
 
 	private ShardDirectoryRepository shardDirectory;
+	private CustomerExternalService customerService;
 	private NotificationRegionResolver resolver;
 
 	@BeforeEach
 	void setUp() {
 		shardDirectory = mock(ShardDirectoryRepository.class);
-		resolver = new NotificationRegionResolver(shardDirectory, new RegionResolver());
+		customerService = mock(CustomerExternalService.class);
+		resolver = new NotificationRegionResolver(
+				shardDirectory, new RegionResolver(), customerService);
 	}
 
 	@Test
@@ -117,5 +123,64 @@ class NotificationRegionResolverTest {
 				() -> resolver.regionFor(RecipientType.STAFF, "  ", "HCM"));
 		assertThrows(IllegalArgumentException.class,
 				() -> resolver.regionFor(null, STAFF_ID, "HCM"));
+	}
+
+
+	// --- regionForCustomer: the read path (§9.1, §9.2) -------------------------------------
+
+	@Test
+	void readsACustomersStoreStraightFromTheDirectory() {
+		when(shardDirectory.findRegion(SubjectType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(Optional.of(Region.SOUTH));
+
+		assertEquals(Region.SOUTH, resolver.regionForCustomer(CUSTOMER_ID));
+
+		verifyNoInteractions(customerService);
+		verify(shardDirectory, never()).register(any(), anyString(), any());
+	}
+
+	@Test
+	void fallsBackToTheProfileAndBackfillsTheDirectory() {
+		when(shardDirectory.findRegion(SubjectType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(Optional.empty());
+		when(customerService.findHomeRegion(CUSTOMER_ID)).thenReturn(Optional.of(Region.NORTH));
+		when(shardDirectory.register(SubjectType.CUSTOMER, CUSTOMER_ID, Region.NORTH))
+				.thenReturn(Region.NORTH);
+
+		assertEquals(Region.NORTH, resolver.regionForCustomer(CUSTOMER_ID));
+
+		// The backfill is the point: the next read must not need the profile again.
+		verify(shardDirectory).register(SubjectType.CUSTOMER, CUSTOMER_ID, Region.NORTH);
+	}
+
+	@Test
+	void stillAnswersWhenTheDirectoryCannotBeWrittenTo() {
+		when(shardDirectory.findRegion(SubjectType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(Optional.empty());
+		when(customerService.findHomeRegion(CUSTOMER_ID)).thenReturn(Optional.of(Region.SOUTH));
+		when(shardDirectory.register(any(), anyString(), any()))
+				.thenThrow(new IllegalStateException("both stores refused the write"));
+
+		assertEquals(Region.SOUTH, resolver.regionForCustomer(CUSTOMER_ID),
+				"a failed cache write must not discard an answer the profile already gave");
+	}
+
+	@Test
+	void treatsAnAuthenticatedCallerWithNoProfileAsAFaultNotANotFound() {
+		when(shardDirectory.findRegion(SubjectType.CUSTOMER, CUSTOMER_ID))
+				.thenReturn(Optional.empty());
+		when(customerService.findHomeRegion(CUSTOMER_ID)).thenReturn(Optional.empty());
+
+		// Not ApiException: the caller passed authentication, so a missing profile is our
+		// data being wrong, not their request. Matches BookingServiceImpl on the same case.
+		assertThrows(IllegalStateException.class, () -> resolver.regionForCustomer(CUSTOMER_ID));
+	}
+
+	@Test
+	void rejectsAMissingCustomerIdBeforeTouchingTheDirectory() {
+		assertThrows(IllegalArgumentException.class, () -> resolver.regionForCustomer("  "));
+		assertThrows(IllegalArgumentException.class, () -> resolver.regionForCustomer(null));
+
+		verifyNoInteractions(shardDirectory, customerService);
 	}
 }

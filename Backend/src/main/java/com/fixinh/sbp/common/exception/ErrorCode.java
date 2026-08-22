@@ -72,6 +72,8 @@ public enum ErrorCode {
 			"The staff account was created, but the welcome email could not be sent. "
 					+ "It will be retried automatically."),
 
+	NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "No notification exists with this id."),
+
 	// --- Field-level: password (Req 3.1.M1) ---
 	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,
 			"Password must be at least 8 characters.", "Fixinh@2026"),
