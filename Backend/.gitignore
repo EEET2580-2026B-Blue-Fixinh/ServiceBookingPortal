@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Local test scratch ###
+sbp-test.ps1
+
 # Environment and credentials (never commit secrets!)
 .env
 *.env.local
