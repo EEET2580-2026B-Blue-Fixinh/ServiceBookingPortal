@@ -116,7 +116,7 @@ export function LoginPage() {
     };
 
     handleGoogleCallback();
-  }, []); // Empty dependency array - only run once on mount
+  }, [location.state?.from?.pathname, navigate, startSession]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;

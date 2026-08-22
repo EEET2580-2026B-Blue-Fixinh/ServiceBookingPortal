@@ -31,6 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class GoogleOAuthService {
+	private static final NetHttpTransport HTTP_TRANSPORT = new NetHttpTransport();
+	private static final GsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
 
 	private final SbpProperties sbpProperties;
 
@@ -38,17 +40,20 @@ public class GoogleOAuthService {
 	 * Exchanges the authorization code for a verified Google user profile.
 	 *
 	 * @param code Authorization code from Google's redirect.
+	 * @param redirectUri Redirect URI used to request the code.
 	 * @return Verified payload containing email, name, and picture.
-	 * @throws ApiException GOOGLE_OAUTH_FAILED if the code is invalid or verification fails.
+	 * @throws ApiException OAUTH_CODE_INVALID or OAUTH_PROVIDER_UNAVAILABLE.
 	 */
 	public GoogleUserInfo verifyCodeAndGetUser(String code, String redirectUri) {
+		String configuredRedirectUri = sbpProperties.getOauth().getGoogle().getRedirectUri();
+		if (configuredRedirectUri == null || !configuredRedirectUri.equals(redirectUri)) {
+			throw new ApiException(ErrorCode.OAUTH_CODE_INVALID);
+		}
 		try {
-			NetHttpTransport transport = new NetHttpTransport();
-			GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
 			// Exchange authorization code for tokens
 			GoogleTokenResponse tokenResponse = new GoogleAuthorizationCodeTokenRequest(
-					transport,
-					jsonFactory,
+					HTTP_TRANSPORT,
+					JSON_FACTORY,
 					"https://oauth2.googleapis.com/token",
 					sbpProperties.getOauth().getGoogle().getClientId(),
 					sbpProperties.getOauth().getGoogle().getClientSecret(),
@@ -58,7 +63,8 @@ public class GoogleOAuthService {
 
 			// Verify ID token
 			GoogleIdToken idToken = tokenResponse.parseIdToken();
-			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory)
+			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+					HTTP_TRANSPORT, JSON_FACTORY)
 					.setAudience(List.of(sbpProperties.getOauth().getGoogle().getClientId()))
 					.build();
 			if (idToken == null || !verifier.verify(idToken)) {

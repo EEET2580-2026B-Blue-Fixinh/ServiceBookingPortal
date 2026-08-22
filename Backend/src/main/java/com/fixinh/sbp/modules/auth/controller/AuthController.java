@@ -52,11 +52,4 @@ public class AuthController {
 	public AuthTokenDto loginWithGoogle(@Valid @RequestBody GoogleLoginCommand command) {
 		return authService.loginWithGoogle(command);
 	}
-
-	/**
-	 * Completes a Google OAuth user's profile by adding their address (Req 3.2.U3).
-	 *
-	 * <p>Google users can sign in without an address, but they must provide one before booking
-	 * a service so the system can assign them to a region and match them with nearby providers.
-	 */
 }

@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *
  * <p>{@code accountCreated} is true for Google sign-ins that just registered a new account.
  * {@code profileCompletionRequired} is true when a Google user has no address yet and must
- * fill one in before booking (Req 3.2.U3).
+ * fill one in before booking so their regional shard can be resolved (Req 3.1.U1-U2).
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthTokenDto(

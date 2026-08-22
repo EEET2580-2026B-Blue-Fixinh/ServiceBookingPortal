@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
+import com.fixinh.sbp.modules.admin.model.Administrator;
+import com.fixinh.sbp.modules.booking.model.ServiceBooking;
 import com.fixinh.sbp.modules.notification.model.Notification;
 
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,30 @@ public class ShardIndexInitializer {
         ensureCredentialIndexes(north, Region.NORTH);
         ensureNotificationIndexes(south, Region.SOUTH);
         ensureNotificationIndexes(north, Region.NORTH);
+        ensureBookingIndexes(south, Region.SOUTH);
+        ensureBookingIndexes(north, Region.NORTH);
+        ensureAdministratorIndexes(south);
+    }
+
+    private void ensureBookingIndexes(MongoTemplate template, Region region) {
+        try {
+            IndexOperations indexes = template.indexOps(ServiceBooking.class);
+            indexes.createIndex(new Index().on("bookingRef", Sort.Direction.ASC).unique());
+            indexes.createIndex(new Index().on("customerId", Sort.Direction.ASC));
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure booking indexes on {} shard", region, ex);
+        }
+    }
+
+    private void ensureAdministratorIndexes(MongoTemplate template) {
+        try {
+            template.indexOps(Administrator.class)
+                    .createIndex(new Index().on(EMAIL, Sort.Direction.ASC));
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure administrator indexes", ex);
+        }
     }
 
     private void ensureCredentialIndexes(MongoTemplate template, Region region) {
@@ -84,6 +110,8 @@ public class ShardIndexInitializer {
                 indexes.createIndex(new Index().on(PHONE_NUMBER, Sort.Direction.ASC)
                         .unique().sparse());
             }
+            indexes.createIndex(new Index()
+                    .on("authenticationIdentities.externalAccountIdentifier", Sort.Direction.ASC));
             log.info("Credential indexes ensured on {} shard ({})", region,
                     template.getDb().getName());
         }

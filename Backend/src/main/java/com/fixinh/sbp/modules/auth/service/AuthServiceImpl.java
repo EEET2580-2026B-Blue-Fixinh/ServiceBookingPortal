@@ -168,6 +168,9 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		GoogleUserInfo googleUser = googleOAuthService.verifyCodeAndGetUser(
 				command.authorizationCode(), command.redirectUri());
 		String email = googleUser.email().trim().toLowerCase(Locale.ROOT);
+		String displayName = googleUser.name() == null || googleUser.name().isBlank()
+				? email.substring(0, email.indexOf('@'))
+				: googleUser.name();
 
 		// Try to find existing account by email (check both regions)
 		Optional<UserCredential> existingCredential =
@@ -221,8 +224,8 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 					.authProviders(new HashSet<>(Set.of(AuthProvider.GOOGLE)))
 					.authenticationIdentities(List.of(googleIdentity(googleUser.subject())))
 					.registeredAt(Instant.now().truncatedTo(ChronoUnit.MILLIS))
-					// Google users start in south region until they add address (Req 3.2.U3)
-					.homeRegion(Region.SOUTH)
+					// Address-less users remain in the configured default shard temporarily.
+					.homeRegion(regionResolver.defaultRegion())
 					.build();
 			
 			// Save credential first (profile will be created when user completes address)
@@ -233,11 +236,11 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				throw new ApiException(ErrorCode.EMAIL_ALREADY_REGISTERED);
 			}
 			
-			// Create minimal customer profile without address (Req 3.2.U3)
+			// Create a minimal profile; address completion later resolves its shard (Req 3.1.U1-U2).
 			// If this fails, rollback the credential to maintain consistency
 			try {
 				customerService.createProfile(
-						new CustomerCreateCommand(userId, email, googleUser.name(), null));
+						new CustomerCreateCommand(userId, email, displayName, null));
 			} catch (Exception ex) {
 				// Rollback: delete the credential we just created
 				try {
@@ -249,11 +252,6 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				log.error("Failed to create customer profile for Google user: {}", email, ex);
 				throw new ApiException(ErrorCode.INTERNAL_ERROR);
 			}
-		}
-
-		// Check account status after finding/creating
-		if (credential.getAccountStatus() == AccountStatus.DEACTIVATED) {
-			throw new ApiException(ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
 		}
 
 		// Issue JWT token

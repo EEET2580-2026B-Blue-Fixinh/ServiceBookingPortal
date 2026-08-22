@@ -35,15 +35,4 @@ public interface AuthExternalService {
 	 *         AUTH_ACCOUNT_DEACTIVATED
 	 */
 	AuthTokenDto loginWithGoogle(GoogleLoginCommand command);
-
-	/**
-	 * Completes a Google OAuth user's profile by adding their address (Req 3.2.U3).
-	 *
-	 * <p>Google users start without an address. This endpoint lets them provide it so they can
-	 * be assigned to a region and book services from nearby providers.
-	 *
-	 * @param userId The authenticated user's ID (from JWT token)
-	 * @throws com.fixinh.sbp.common.exception.ApiException VALIDATION_FAILED or
-	 *         PROVINCE_CODE_INVALID
-	 */
 }

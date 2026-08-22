@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { completeAddress } from "../../services/api/endpoints/customerEndpoints";
 
 /**
- * Profile completion for new Google Sign-In users (Req 3.2.U3).
+ * Address completion for regional shard placement (Req 3.1.U1-U2).
  *
  * A Google user who just signed in for the first time has an account but no address,
  * which means they cannot book a service yet. This page collects the address and
