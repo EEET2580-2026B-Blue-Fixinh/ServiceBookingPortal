@@ -36,6 +36,7 @@ build/
 sbp-test.ps1
 sbp-test-step10.ps1
 step10-check.ps1
+acceptance-notifications.ps1
 
 # Environment and credentials (never commit secrets!)
 .env
