@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.admin.service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -83,10 +84,19 @@ public class AdminServiceImpl implements AdminInternalService {
 
 	@Override
 	public List<CustomerDto> listCustomers() {
+		// Both listByRole and listAll concatenate the north and south shards without
+		// deduplicating. Each customer is supposed to live in exactly one shard, but a
+		// stray record left in both (e.g. an incomplete region relocation) must not take
+		// down the whole listing - keep the first copy seen rather than throwing.
 		var credentialsById = authService.listByRole(Role.CUSTOMER).stream()
-				.collect(Collectors.toMap(UserCredential::getId, credential -> credential));
+				.collect(Collectors.toMap(UserCredential::getId, credential -> credential,
+						(first, duplicate) -> first));
 
-		return customerService.listAll().stream()
+		var profilesById = customerService.listAll().stream()
+				.collect(Collectors.toMap(Customer::getId, profile -> profile,
+						(first, duplicate) -> first, LinkedHashMap::new));
+
+		return profilesById.values().stream()
 				.map(profile -> toDto(profile, credentialsById.get(profile.getId())))
 				.toList();
 	}
