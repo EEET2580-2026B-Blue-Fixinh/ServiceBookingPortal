@@ -124,12 +124,7 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 		};
 	}
 
-	private DeliveryStatus deliveryStatusOnArrival(DeliveryChannel channel) {
-		return channel == DeliveryChannel.IN_APP ? DeliveryStatus.SENT : DeliveryStatus.PENDING;
-	}
-
-		// --- The recipient's own history -----------------------------------------
-
+	// --- The recipient's own history -----------------------------------------
 	@Override
 	public NotificationListDto list(String callerId, Role callerRole, Boolean unreadOnly,
 			Integer page, Integer size) {

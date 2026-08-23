@@ -152,7 +152,7 @@ public class NotificationRetryScheduler {
 		notificationRepository.save(notification);
 	}
 
-		private void giveUp(Notification notification) {
+	private void giveUp(Notification notification) {
 		log.error("Abandoning notification {} to {} - it is already past the {}-attempt cap",
 				notification.getId(), notification.getRecipientAddress(), retry.getMaxAttempts());
 		notification.abandon();

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MaterialIcon } from '../shared/icons'
 import { useAuth } from '../../context/AuthContext'
+import { NotificationBell } from '../shared/notifications/NotificationBell'
 
 // Only "My bookings" is a real page so far — the rest of the booking module
 // (new-booking wizard, ratings, profile) isn't built yet. They stay visible
@@ -139,17 +140,7 @@ export function BookingShell({ activeNav, breadcrumb, title, headerActions, chil
             >
               <MaterialIcon name={isDark ? 'light_mode' : 'dark_mode'} />
             </button>
-            <button
-              type="button"
-              aria-label="Notifications"
-              title="Coming soon"
-              className="relative flex h-[38px] w-[38px] appearance-none items-center justify-center rounded-[9px] border border-bk-border bg-bk-surface text-bk-text hover:border-bk-muted"
-            >
-              <MaterialIcon name="notifications" />
-              <span className="absolute -right-[5px] -top-[5px] flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-[3px] text-[10px] font-bold leading-none text-white">
-                4
-              </span>
-            </button>
+            <NotificationBell />
             {headerActions}
           </div>
         </header>
