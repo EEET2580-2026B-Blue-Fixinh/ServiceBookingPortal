@@ -16,3 +16,17 @@ export async function fetchProvinces() {
   const response = await apiClient.get(API_ENDPOINTS.REFERENCE.PROVINCES, { auth: false })
   return response.items
 }
+
+/**
+ * GET /reference/repair-services (Section 5.2). Requires a token — unlike provinces, the
+ * booking form is only reachable once signed in. Defaults to active-only, which is what the
+ * booking form always wants; the filter panel on My Bookings would pass `false`.
+ *
+ * @returns {Promise<Array<{serviceId: string, serviceName: string, categoryName: string,
+ *                          baseServiceFee: number, standardDurationMinutes: number,
+ *                          isActive: boolean}>>}
+ */
+export async function fetchRepairServices() {
+  const response = await apiClient.get(API_ENDPOINTS.REFERENCE.REPAIR_SERVICES)
+  return response.items
+}

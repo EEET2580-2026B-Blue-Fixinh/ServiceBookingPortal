@@ -34,6 +34,13 @@ export const API_ENDPOINTS = {
   // registration form needs the province list before an account exists.
   REFERENCE: {
     PROVINCES: "/reference/provinces",
+    REPAIR_SERVICES: "/reference/repair-services",
+  },
+
+  // A booking belongs to whoever's token creates it (Section 7) — none of these
+  // take a customer id, the same reason CUSTOMERS.MY_ADDRESS above has none.
+  BOOKINGS: {
+    CREATE: "/bookings",
   },
   // The signed-in caller's own notifications (API Documentation Section 9). Every
   // one of these acts on whoever the token names; none of them takes a recipient.

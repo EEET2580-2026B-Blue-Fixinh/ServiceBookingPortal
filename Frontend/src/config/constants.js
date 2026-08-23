@@ -18,6 +18,7 @@ export const ROUTES = {
   LOGIN: "/login",
   REGISTER: "/register",
   BOOKING: "/booking",
+  NEW_BOOKING: "/booking/new",
   ADMIN: "/admin",
   PROFILE_COMPLETION: "/profile/complete", // Address-based shard placement (Req 3.1.U1-U2)
 };

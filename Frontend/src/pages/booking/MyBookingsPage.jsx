@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { BookingShell } from "../../components/booking/BookingShell";
 import { StatusBadge } from "../../components/booking/StatusBadge";
 import { StarRating } from "../../components/booking/StarRating";
@@ -132,6 +132,7 @@ function BookingSection({ title, dotClassName, count, bookings }) {
 
 export function MyBookingsPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
 
   const setFilter = (key) => (value) =>
@@ -163,7 +164,7 @@ export function MyBookingsPage() {
       headerActions={
         <button
           type="button"
-          title="Coming soon"
+          onClick={() => navigate("/booking/new")}
           className="flex h-[38px] appearance-none items-center gap-1.5 rounded-[9px] bg-bk-teal px-4 text-sm font-bold text-white hover:bg-bk-teal-strong"
         >
           <MaterialIcon name="add" className="text-[19px]" />

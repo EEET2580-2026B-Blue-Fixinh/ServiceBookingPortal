@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.reference.service;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.boot.ApplicationArguments;
@@ -36,6 +37,7 @@ public class RepairServiceCatalogSeeder implements ApplicationRunner {
 
 	private final SmpBookingClient smpBookingClient;
 	private final RepairServiceTypeRepository repository;
+	private final RepairServiceCatalogSyncStatus syncStatus;
 
 	@Override
 	public void run(ApplicationArguments args) {
@@ -45,6 +47,8 @@ public class RepairServiceCatalogSeeder implements ApplicationRunner {
 			RepairServiceType existing = repository.findByServiceId(entry.serviceId()).orElse(null);
 			repository.save(toEntity(entry, existing));
 		}
+
+		syncStatus.recordSync(Instant.now());
 
 		log.info("Repair-service catalogue seeded: {} entr{} synced from SMP.",
 				catalogue.size(), catalogue.size() == 1 ? "y" : "ies");
