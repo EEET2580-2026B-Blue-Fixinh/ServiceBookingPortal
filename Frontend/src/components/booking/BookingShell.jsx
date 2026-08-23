@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MaterialIcon } from '../shared/icons'
 import { useAuth } from '../../context/AuthContext'
-import { useNotifications } from '../../hooks/useNotifications'
+import { NotificationBell } from '../shared/notifications/NotificationBell'
 
 // Only "My bookings" is a real page so far — the rest of the booking module
 // (new-booking wizard, ratings, profile) isn't built yet. They stay visible
@@ -65,7 +65,6 @@ export function BookingShell({ activeNav, breadcrumb, title, headerActions, chil
   const [isDark, setIsDark] = useState(false)
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { unreadCount } = useNotifications()
 
   const handleSignOut = () => {
     logout()
@@ -141,22 +140,7 @@ export function BookingShell({ activeNav, breadcrumb, title, headerActions, chil
             >
               <MaterialIcon name={isDark ? 'light_mode' : 'dark_mode'} />
             </button>
-            <button
-                type="button"
-                aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-                title="Coming soon"
-                className="relative flex h-[38px] w-[38px] appearance-none items-center justify-center rounded-[9px] border border-bk-border bg-bk-surface text-bk-text hover:border-bk-muted"
-              >
-                <MaterialIcon name="notifications" />
-                {unreadCount > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-[5px] -top-[5px] flex h-4 min-w-[16px] items-center justify-center rounded-full bg-bk-red px-[3px] text-[10px] font-bold leading-none text-white"
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
+            <NotificationBell />
             {headerActions}
           </div>
         </header>
