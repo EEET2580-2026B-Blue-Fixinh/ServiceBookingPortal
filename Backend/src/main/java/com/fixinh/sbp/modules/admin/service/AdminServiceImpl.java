@@ -47,6 +47,7 @@ public class AdminServiceImpl implements AdminInternalService {
 	private final SmpStaffClient smpStaffClient;
 	private final ReferenceExternalService referenceService;
 	private final NotificationInternalService notificationService;
+	private final StaffCreateValidator staffCreateValidator;
 
 	/**
 	 * Lazy because the dependency runs the other way at sign-in: auth resolves an
@@ -68,12 +69,14 @@ public class AdminServiceImpl implements AdminInternalService {
 			SmpStaffClient smpStaffClient,
 			ReferenceExternalService referenceService,
 			NotificationInternalService notificationService,
+			StaffCreateValidator staffCreateValidator,
 			@Lazy AuthInternalService authService) {
 		this.administratorRepository = administratorRepository;
 		this.customerService = customerService;
 		this.smpStaffClient = smpStaffClient;
 		this.referenceService = referenceService;
 		this.notificationService = notificationService;
+		this.staffCreateValidator = staffCreateValidator;
 		this.authService = authService;
 	}
 
@@ -132,6 +135,8 @@ public class AdminServiceImpl implements AdminInternalService {
 
 	@Override
 	public StaffDto createStaff(StaffCreateCommand command) {
+		staffCreateValidator.validate(command);
+
 		SmpStaffDto created;
 		try {
 			created = smpStaffClient.createStaff(new SmpStaffCreateRequest(
