@@ -49,6 +49,10 @@ export function AdminStaffPage() {
   const [staff, setStaff] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Distinct from `error` above: that one is for "the list failed to load".
+  // This is feedback about the outcome of creating a staff account, which can be
+  // a warning (account created, email pending) rather than a failure.
+  const [notice, setNotice] = useState(null)
   const [search, setSearch] = useState('')
 
   const [dialogMode, setDialogMode] = useState(null)
@@ -81,6 +85,7 @@ export function AdminStaffPage() {
 
   const openCreateDialog = () => {
     setDialogError('')
+    setNotice(null)
     setDialogInitialValues(null)
     setDialogMode('create')
   }
@@ -106,18 +111,34 @@ export function AdminStaffPage() {
   }
 
   const handleSubmit = async (payload) => {
+    const isCreate = dialogMode === 'create'
     setDialogPending(true)
     setDialogError('')
     try {
-      if (dialogMode === 'edit') {
-        await updateStaff(dialogInitialValues.staffId, payload)
-      } else {
+      if (isCreate) {
         await createStaff(payload)
+        setNotice({ variant: 'success', message: 'Staff account created. Welcome email sent.' })
+      } else {
+        await updateStaff(dialogInitialValues.staffId, payload)
       }
       closeDialog()
       loadStaff()
     } catch (err) {
-      setDialogError(err.message)
+      // API Documentation §10.6: a 502 EMAIL_DELIVERY_FAILED means the staff
+      // account already exists in SMP — only the welcome email failed, and it's
+      // being retried in the background. Treating it like any other failure
+      // would leave the dialog open, and a retried submit would create a
+      // second staff account for the same person.
+      if (isCreate && err.code === 'EMAIL_DELIVERY_FAILED') {
+        setNotice({
+          variant: 'warning',
+          message: "Account created. Welcome email hasn't gone out yet; we'll keep retrying.",
+        })
+        closeDialog()
+        loadStaff()
+      } else {
+        setDialogError(err.message)
+      }
     } finally {
       setDialogPending(false)
     }
@@ -142,6 +163,20 @@ export function AdminStaffPage() {
       {error && (
         <p className="mb-4 rounded-[9px] border border-bk-red bg-bk-red-soft px-4 py-2.5 text-bk-red" role="alert">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p
+          className={
+            notice.variant === 'success'
+              ? 'mb-4 rounded-[9px] border border-bk-green bg-bk-green-soft px-4 py-2.5 text-bk-green'
+              : 'mb-4 rounded-[9px] border border-bk-amber bg-bk-amber-soft px-4 py-2.5 text-bk-amber'
+          }
+          role={notice.variant === 'success' ? 'status' : 'alert'}
+          aria-live={notice.variant === 'success' ? 'polite' : 'assertive'}
+        >
+          {notice.message}
         </p>
       )}
 

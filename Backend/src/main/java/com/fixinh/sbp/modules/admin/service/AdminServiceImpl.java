@@ -28,23 +28,24 @@ import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.customer.dto.external.CustomerDto;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.model.Customer;
+import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
+import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
+import com.fixinh.sbp.modules.notification.interfaces.internal.NotificationInternalService;
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
-
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * The admin module's own logic: the profile lookup sign-in needs, plus customer and staff
  * account management (Req 3.5.S1, 3.5.S2).
  */
 @Service
-@Slf4j
 public class AdminServiceImpl implements AdminInternalService {
 
 	private final AdministratorRepository administratorRepository;
 	private final CustomerExternalService customerService;
 	private final SmpStaffClient smpStaffClient;
 	private final ReferenceExternalService referenceService;
+	private final NotificationInternalService notificationService;
 
 	/**
 	 * Lazy because the dependency runs the other way at sign-in: auth resolves an
@@ -65,11 +66,13 @@ public class AdminServiceImpl implements AdminInternalService {
 			CustomerExternalService customerService,
 			SmpStaffClient smpStaffClient,
 			ReferenceExternalService referenceService,
+			NotificationInternalService notificationService,
 			@Lazy AuthInternalService authService) {
 		this.administratorRepository = administratorRepository;
 		this.customerService = customerService;
 		this.smpStaffClient = smpStaffClient;
 		this.referenceService = referenceService;
+		this.notificationService = notificationService;
 		this.authService = authService;
 	}
 
@@ -132,7 +135,20 @@ public class AdminServiceImpl implements AdminInternalService {
 			throw new ApiException(ErrorCode.EMAIL_ALREADY_REGISTERED);
 		}
 
-		return StaffDto.created(created, sendWelcomeEmail(created));
+		StaffWelcomeEmailResult emailResult = notificationService.sendStaffWelcomeEmail(
+				new StaffWelcomeEmailCommand(
+						created.staffId(),
+						created.fullName(),
+						created.email(),
+						created.staffRole().name(),
+						created.initialPassword(),
+						created.branchProvinceCode()));
+
+		if (!emailResult.sent()) {
+			throw new ApiException(ErrorCode.EMAIL_DELIVERY_FAILED);
+		}
+
+		return StaffDto.created(created, true);
 	}
 
 	@Override
@@ -157,17 +173,5 @@ public class AdminServiceImpl implements AdminInternalService {
 				.findFirst()
 				.map(ProvinceDto::provinceName)
 				.orElse(branchProvinceCode);
-	}
-
-	/**
-	 * Req 3.1.S5: SBP sends the welcome email carrying {@link SmpStaffDto#initialPassword()}.
-	 * The notification module is not built yet (still an empty scaffold), so this cannot send
-	 * anything today — {@code notificationSent} honestly reports that, rather than lying to the
-	 * administrator. Replace with a real call once that module lands.
-	 */
-	private boolean sendWelcomeEmail(SmpStaffDto staff) {
-		log.warn("Welcome email for new staff member {} was not sent: the notification module "
-				+ "is not implemented yet.", staff.staffId());
-		return false;
 	}
 }

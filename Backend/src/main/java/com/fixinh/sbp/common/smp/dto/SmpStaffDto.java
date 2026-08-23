@@ -19,4 +19,18 @@ public record SmpStaffDto(
 		 * response except the one immediately after {@code createStaff}.
 		 */
 		String initialPassword) {
+
+	/**
+	 * <b>Redacts the password.</b> A record's generated {@code toString()} prints every
+	 * component, so one careless log statement would put a staff member's initial password in
+	 * the application log. See {@code StaffWelcomeEmailCommand#toString()} for the same fix.
+	 */
+	@Override
+	public String toString() {
+		return "SmpStaffDto[staffId=%s, fullName=%s, email=%s, phoneNumber=%s, staffRole=%s, "
+				+ "employmentStatus=%s, address=%s, branchProvinceCode=%s, "
+				+ "initialPassword=<redacted>]"
+						.formatted(staffId, fullName, email, phoneNumber, staffRole,
+								employmentStatus, address, branchProvinceCode);
+	}
 }
