@@ -6,6 +6,7 @@ import { ProfileCompletionPage } from "../auth/ProfileCompletionPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { AdminRoute } from "./AdminRoute";
 import { MyBookingsPage } from "../booking/MyBookingsPage";
+import { NewBookingPage } from "../booking/NewBookingPage";
 import { AdminCustomersPage } from "../admin/AdminCustomersPage";
 import { AdminStaffPage } from "../admin/AdminStaffPage";
 import { AdminHomePage } from "../admin/AdminHomePage";
@@ -29,6 +30,7 @@ export function AppRoutes() {
           element={<ProfileCompletionPage />}
         />
         <Route path={ROUTES.BOOKING} element={<MyBookingsPage />} />
+        <Route path={ROUTES.NEW_BOOKING} element={<NewBookingPage />} />
       </Route>
 
       {/* Admins only. AdminRoute turns away a signed-in CUSTOMER as well as an

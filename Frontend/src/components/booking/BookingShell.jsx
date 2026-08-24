@@ -4,13 +4,12 @@ import { MaterialIcon } from '../shared/icons'
 import { useAuth } from '../../context/AuthContext'
 import { NotificationBell } from '../shared/notifications/NotificationBell'
 
-// Only "My bookings" is a real page so far — the rest of the booking module
-// (new-booking wizard, ratings, profile) isn't built yet. They stay visible
-// in the nav so the shell reads as the finished app, but they intentionally
-// don't navigate anywhere yet.
+// "My bookings" and "New booking" are real pages now — ratings and profile
+// aren't built yet. They stay visible in the nav so the shell reads as the
+// finished app, but they intentionally don't navigate anywhere yet.
 const NAV_ITEMS = [
   { key: 'bookings', label: 'My bookings', icon: 'list_alt', to: '/booking' },
-  { key: 'new', label: 'New booking', icon: 'add_circle' },
+  { key: 'new', label: 'New booking', icon: 'add_circle', to: '/booking/new' },
   { key: 'ratings', label: 'My ratings', icon: 'reviews' },
   { key: 'profile', label: 'Profile', icon: 'account_circle' },
 ]
