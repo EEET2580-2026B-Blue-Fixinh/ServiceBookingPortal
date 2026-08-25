@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useVietnamAddress } from '../../hooks/useVietnamAddress'
-import { SelectField } from '../shared/form/SelectField/SelectField'
+import { useVietnamAddress } from '../../../../hooks/useVietnamAddress'
+import { SelectField } from '../../../shared/form/SelectField/SelectField'
+import { isValidEmail, isValidVietnamesePhone } from '../../../../utils/validators'
 
 const ROLE_OPTIONS = ['Technician', 'Receptionist']
 const STATUS_OPTIONS = ['Active', 'Inactive']
@@ -9,6 +10,18 @@ const roleToApi = (label) => (label === 'Technician' ? 'TECHNICIAN' : 'RECEPTION
 const roleToLabel = (value) => (value === 'TECHNICIAN' ? 'Technician' : 'Receptionist')
 const statusToApi = (label) => (label === 'Active' ? 'ACTIVE' : 'INACTIVE')
 const statusToLabel = (value) => (value === 'INACTIVE' ? 'Inactive' : 'Active')
+
+// Which form field a backend fieldErrors[] entry belongs to (API Documentation
+// Section 2.7). address/address.provinceCode land on the address city select,
+// the only address control the admin can act on directly.
+const FIELD_BY_BACKEND_NAME = {
+  fullName: 'fullName',
+  email: 'email',
+  phoneNumber: 'phoneNumber',
+  address: 'city',
+  'address.provinceCode': 'city',
+  branchProvinceCode: 'branch',
+}
 
 const EMPTY_FORM = {
   fullName: '',
@@ -25,11 +38,37 @@ const FIELD_CLASS =
   'focus:ring-[3px] focus:ring-bk-teal-soft disabled:bg-bk-bg disabled:text-bk-muted'
 const LABEL_CLASS = 'text-[12.5px] font-semibold text-bk-muted'
 
-export function StaffFormDialog({ open, mode, initialValues, pending, error, onSubmit, onCancel }) {
+function FieldError({ message }) {
+  if (!message) return null
+  return <p className="text-[12px] text-bk-red">{message}</p>
+}
+
+export function StaffForm({
+  open,
+  mode,
+  initialValues,
+  pending,
+  error,
+  fieldErrors = {},
+  onSubmit,
+  onCancel,
+}) {
   const isEdit = mode === 'edit'
   const address = useVietnamAddress()
   const [form, setForm] = useState(EMPTY_FORM)
   const [prefilled, setPrefilled] = useState(false)
+  // The branch a new hire works out of - separate from the address province
+  // above, which is only where they live. Reuses the same province list
+  // useVietnamAddress already fetched rather than a second hook instance.
+  const [branchProvinceName, setBranchProvinceName] = useState('')
+  const [clientErrors, setClientErrors] = useState({})
+
+  const backendFieldErrors = {}
+  for (const [backendField, message] of Object.entries(fieldErrors)) {
+    const formField = FIELD_BY_BACKEND_NAME[backendField]
+    if (formField) backendFieldErrors[formField] = message
+  }
+  const fieldError = (key) => clientErrors[key] ?? backendFieldErrors[key]
 
   // Resets the form whenever the dialog closes, so the next open (create or edit,
   // for a different staff member) never shows stale data from the last session.
@@ -38,6 +77,8 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
   useEffect(() => {
     if (!open) {
       setPrefilled(false)
+      setBranchProvinceName('')
+      setClientErrors({})
       return
     }
     if (prefilled) return
@@ -59,6 +100,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
       setPrefilled(true)
     } else if (!isEdit) {
       setForm(EMPTY_FORM)
+      setBranchProvinceName('')
       setPrefilled(true)
     }
     // address is a fresh object each render; prefilled guards this from looping.
@@ -81,8 +123,33 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
 
   const setField = (key) => (event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))
 
+  const branchProvinceCode =
+    address.provinces.find((p) => p.provinceName === branchProvinceName)?.provinceCode ?? ''
+
+  // Format checks the native input attributes cannot express (an email needs a
+  // domain, a phone number needs a real Vietnamese prefix) - the required-ness
+  // of each field is still enforced by the input's own `required` attribute.
+  const validateClient = () => {
+    const errors = {}
+    if (form.email && !isEdit && !isValidEmail(form.email)) {
+      errors.email = 'Enter a valid email address.'
+    }
+    if (form.phoneNumber && !isValidVietnamesePhone(form.phoneNumber)) {
+      errors.phoneNumber = 'Enter a valid Vietnamese phone number.'
+    }
+    if (!isEdit && !branchProvinceCode) {
+      errors.branch = 'Select the branch this staff member belongs to.'
+    }
+    return errors
+  }
+
   const handleSubmit = (event) => {
     event.preventDefault()
+
+    const errors = validateClient()
+    setClientErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     const staffAddress = {
       streetNumber: form.streetNumber.trim(),
       streetName: form.streetName.trim(),
@@ -104,7 +171,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
             phoneNumber: form.phoneNumber.trim(),
             staffRole: roleToApi(form.staffRole),
             address: staffAddress,
-            branchProvinceCode: address.cityCode,
+            branchProvinceCode,
           },
     )
   }
@@ -133,6 +200,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
               required
               className={FIELD_CLASS}
             />
+            <FieldError message={fieldError('fullName')} />
           </div>
 
           <div className="grid grid-cols-2 gap-3.5">
@@ -147,6 +215,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
                 disabled={isEdit}
                 className={FIELD_CLASS}
               />
+              <FieldError message={fieldError('email')} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL_CLASS} htmlFor="staff-phone">Phone number</label>
@@ -158,6 +227,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
                 required
                 className={FIELD_CLASS}
               />
+              <FieldError message={fieldError('phoneNumber')} />
             </div>
           </div>
 
@@ -228,6 +298,7 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
                 placeholder={address.cityPlaceholder}
                 disabled={address.provincesStatus !== 'ready'}
               />
+              <FieldError message={fieldError('city')} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={LABEL_CLASS} htmlFor="staff-ward">Ward</label>
@@ -241,6 +312,23 @@ export function StaffFormDialog({ open, mode, initialValues, pending, error, onS
               />
             </div>
           </div>
+
+          {!isEdit && (
+            <div className="flex flex-col gap-1.5">
+              <label className={LABEL_CLASS} htmlFor="staff-branch">
+                Branch
+              </label>
+              <SelectField
+                id="staff-branch"
+                value={branchProvinceName}
+                onChange={setBranchProvinceName}
+                options={address.provinces.map((p) => p.provinceName)}
+                placeholder="Select the branch this staff member works out of"
+                disabled={address.provincesStatus !== 'ready'}
+              />
+              <FieldError message={fieldError('branch')} />
+            </div>
+          )}
 
           <div className="mt-2 flex justify-end gap-2.5">
             <button

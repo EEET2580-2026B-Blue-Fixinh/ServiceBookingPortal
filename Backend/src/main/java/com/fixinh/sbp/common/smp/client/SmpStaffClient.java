@@ -14,7 +14,8 @@ import com.fixinh.sbp.common.smp.dto.SmpStaffUpdateRequest;
  */
 public interface SmpStaffClient {
 
-	List<SmpStaffDto> listStaff();
+	/** query null or blank returns every staff member. */
+	List<SmpStaffDto> listStaff(String query);
 
 	Optional<SmpStaffDto> findStaff(String staffId);
 
