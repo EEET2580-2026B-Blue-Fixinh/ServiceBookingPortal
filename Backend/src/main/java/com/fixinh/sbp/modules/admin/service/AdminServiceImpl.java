@@ -120,8 +120,8 @@ public class AdminServiceImpl implements AdminInternalService {
 	}
 
 	@Override
-	public List<StaffDto> listStaff() {
-		return smpStaffClient.listStaff().stream()
+	public List<StaffDto> listStaff(String query) {
+		return smpStaffClient.listStaff(query).stream()
 				.map(staff -> StaffDto.listItem(staff, branchProvinceName(staff.branchProvinceCode())))
 				.toList();
 	}

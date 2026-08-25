@@ -17,7 +17,7 @@ public class LiveSmpStaffClient implements SmpStaffClient {
 	private static final String NOT_IMPLEMENTED = "Live SMP integration is not implemented yet.";
 
 	@Override
-	public List<SmpStaffDto> listStaff() {
+	public List<SmpStaffDto> listStaff(String query) {
 		throw new UnsupportedOperationException(NOT_IMPLEMENTED);
 	}
 

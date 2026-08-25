@@ -20,7 +20,7 @@ public interface AdminInternalService {
 
 	CustomerDto setCustomerStatus(String customerId, AccountStatus status);
 
-	List<StaffDto> listStaff();
+	List<StaffDto> listStaff(String query);
 
 	/** @throws com.fixinh.sbp.common.exception.ApiException STAFF_NOT_FOUND if no such staff member */
 	StaffDto getStaff(String staffId);

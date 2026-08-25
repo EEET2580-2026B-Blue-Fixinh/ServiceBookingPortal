@@ -54,6 +54,7 @@ export function AdminStaffPage() {
         onChange={staff.setSearch}
         matchCount={staff.staff.length}
         totalCount={staff.total}
+        searching={staff.searching}
       />
 
       <StaffList

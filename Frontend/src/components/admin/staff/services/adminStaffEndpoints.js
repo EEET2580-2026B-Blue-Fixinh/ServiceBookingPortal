@@ -2,8 +2,9 @@ import { apiClient } from '../../../../services/api/apiClient'
 
 // Admin-only, requires an ADMIN bearer token (API Documentation Section 10.6-10.7).
 
-export async function fetchStaff() {
-  const response = await apiClient.get('/admin/staff')
+export async function fetchStaff(query) {
+  const path = query ? `/admin/staff?query=${encodeURIComponent(query)}` : '/admin/staff'
+  const response = await apiClient.get(path)
   return response.items
 }
 

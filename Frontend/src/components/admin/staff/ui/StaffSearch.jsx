@@ -1,6 +1,6 @@
 import { MaterialIcon } from '../../../shared/icons'
 
-export function StaffSearch({ value, onChange, matchCount, totalCount }) {
+export function StaffSearch({ value, onChange, matchCount, totalCount, searching }) {
   return (
     <div className="mb-[18px] flex items-center gap-3.5 max-[700px]:flex-wrap">
       <div className="flex flex-1 items-center gap-2 rounded-[9px] border border-bk-border bg-bk-surface px-3 focus-within:border-bk-teal focus-within:ring-[3px] focus-within:ring-bk-teal-soft">
@@ -14,7 +14,7 @@ export function StaffSearch({ value, onChange, matchCount, totalCount }) {
         />
       </div>
       <p className="shrink-0 font-mono text-[12.5px] text-bk-muted">
-        {matchCount} of {totalCount} staff accounts
+        {searching ? 'Searching…' : `${matchCount} of ${totalCount} staff accounts`}
       </p>
     </div>
   )

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fixinh.sbp.common.dto.ListResponse;
@@ -30,8 +31,8 @@ public class AdminStaffController {
 	private final AdminInternalService adminService;
 
 	@GetMapping
-	public ListResponse<StaffDto> listStaff() {
-		return new ListResponse<>(adminService.listStaff());
+	public ListResponse<StaffDto> listStaff(@RequestParam(required = false) String query) {
+		return new ListResponse<>(adminService.listStaff(query));
 	}
 
 	@GetMapping("/{staffId}")

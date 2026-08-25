@@ -6,6 +6,7 @@ import java.security.SecureRandom;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -53,10 +54,22 @@ public class MockSmpStaffClient implements SmpStaffClient {
 	}
 
 	@Override
-	public List<SmpStaffDto> listStaff() {
+	public List<SmpStaffDto> listStaff(String query) {
 		synchronized (staffById) {
-			return List.copyOf(staffById.values());
+			if (query == null || query.isBlank()) {
+				return List.copyOf(staffById.values());
+			}
+			String needle = query.trim().toLowerCase(Locale.ROOT);
+			return staffById.values().stream()
+					.filter(staff -> matches(staff, needle))
+					.toList();
 		}
+	}
+
+	private boolean matches(SmpStaffDto staff, String needle) {
+		return staff.fullName().toLowerCase(Locale.ROOT).contains(needle)
+				|| staff.staffId().toLowerCase(Locale.ROOT).contains(needle)
+				|| staff.email().toLowerCase(Locale.ROOT).contains(needle);
 	}
 
 	@Override
