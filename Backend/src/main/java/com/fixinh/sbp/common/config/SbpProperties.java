@@ -31,6 +31,8 @@ public class SbpProperties {
 		private String secret;
 		private String issuer;
 		private long accessTokenTtlMinutes = 60;
+		/** How long a refresh token stays valid before it must be used or discarded. */
+		private long refreshTokenTtlDays = 30;
 	}
 
 	/**

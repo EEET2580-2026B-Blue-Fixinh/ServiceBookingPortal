@@ -29,6 +29,8 @@ fixinh:
       # Shorten this to test the client's forced sign-out without waiting an hour:
       # JWT_ACCESS_TOKEN_TTL_MINUTES=1. Also what /auth/login reports as expiresIn.
       access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:60}
+      # How long a refresh token is honoured before /auth/refresh must be re-authenticated.
+      refresh-token-ttl-days: ${JWT_REFRESH_TOKEN_TTL_DAYS:30}
 
     mongo:
       # Req 3.1.U1/U2, 4.U1: Customer data is horizontally sharded by region.

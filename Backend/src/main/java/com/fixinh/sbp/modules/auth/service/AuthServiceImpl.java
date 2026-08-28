@@ -19,6 +19,7 @@ import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.security.AccountStatus;
 import com.fixinh.sbp.common.security.Role;
+import com.fixinh.sbp.common.security.blacklist.TokenBlacklistRepository;
 import com.fixinh.sbp.common.security.jwt.JwtTokenProvider;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
@@ -26,6 +27,8 @@ import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
 import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
+import com.fixinh.sbp.modules.auth.dto.internal.LogoutCommand;
+import com.fixinh.sbp.modules.auth.dto.internal.RefreshCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 import com.fixinh.sbp.modules.auth.interfaces.external.AuthExternalService;
 import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
@@ -61,6 +64,8 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider tokenProvider;
 	private final GoogleOAuthService googleOAuthService;
+	private final RefreshTokenService refreshTokenService;
+	private final TokenBlacklistRepository tokenBlacklistRepository;
 
 	@Override
 	public RegisteredCustomerDto register(RegisterCommand command) {
@@ -149,12 +154,19 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 			throw new ApiException(ErrorCode.AUTH_ACCOUNT_DEACTIVATED);
 		}
 
+		// A fresh refresh token is issued (and the previous one, if any, overwritten) on every
+		// sign-in — signing in on a second device invalidates the first device's refresh token,
+		// by design (see the refresh-token README under docs/).
+		String refreshToken = refreshTokenService.issue(credential);
+		credentialRepository.save(credential);
+
 		// The role in the token comes from the credential's discriminator, never from which
 		// collection the profile happened to be found in.
 		return new AuthTokenDto(
 				tokenProvider.generate(credential),
 				TOKEN_TYPE_BEARER,
 				tokenProvider.getAccessTokenTtlSeconds(),
+				refreshToken,
 				new AuthTokenDto.AuthUserDto(
 						credential.getId(),
 						profileReader.fullNameOf(credential),
@@ -207,7 +219,6 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 						: new ArrayList<>(credential.getAuthenticationIdentities());
 				identities.add(googleIdentity(googleUser.subject()));
 				credential.setAuthenticationIdentities(identities);
-				credentialRepository.save(credential);
 			}
 		} else {
 			// New account - create credential without password and without profile (no address yet)
@@ -256,11 +267,18 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 			}
 		}
 
+		// Every sign-in must persist a fresh refresh token — issued unconditionally here rather
+		// than folded into the provider-linking branch above, so the existing-account path always
+		// gets one whether or not it also linked Google this time.
+		String refreshToken = refreshTokenService.issue(credential);
+		credentialRepository.save(credential);
+
 		// Issue JWT token
 		return new AuthTokenDto(
 				tokenProvider.generate(credential),
 				TOKEN_TYPE_BEARER,
 				tokenProvider.getAccessTokenTtlSeconds(),
+				refreshToken,
 				new AuthTokenDto.AuthUserDto(
 						credential.getId(),
 						profileReader.fullNameOf(credential),
@@ -269,6 +287,37 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 				accountCreated,
 				profileCompletionRequired,
 				providerLinked);
+	}
+
+	@Override
+	public AuthTokenDto refresh(RefreshCommand command) {
+		RefreshTokenService.RotationResult rotation =
+				refreshTokenService.verifyAndRotate(command.refreshToken());
+		UserCredential credential = rotation.credential();
+
+		return new AuthTokenDto(
+				tokenProvider.generate(credential),
+				TOKEN_TYPE_BEARER,
+				tokenProvider.getAccessTokenTtlSeconds(),
+				rotation.rawRefreshToken(),
+				new AuthTokenDto.AuthUserDto(
+						credential.getId(),
+						profileReader.fullNameOf(credential),
+						credential.getEmail(),
+						credential.getAccountRole()));
+	}
+
+	@Override
+	public void logout(LogoutCommand command) {
+		// Blacklisted immediately, before the token would otherwise expire (see the
+		// refresh-token README): a stateless JWT is normally valid by signature alone, so this
+		// is the one thing that makes "sign out" actually stop the token from working.
+		tokenBlacklistRepository.blacklist(command.tokenId(), command.tokenExpiresAt());
+
+		credentialRepository.findById(command.credentialId()).ifPresent(credential -> {
+			refreshTokenService.revoke(credential);
+			credentialRepository.save(credential);
+		});
 	}
 
 	private AuthenticationIdentity googleIdentity(String subject) {

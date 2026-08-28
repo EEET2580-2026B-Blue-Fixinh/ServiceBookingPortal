@@ -4,6 +4,8 @@ import com.fixinh.sbp.modules.auth.dto.external.AuthTokenDto;
 import com.fixinh.sbp.modules.auth.dto.external.RegisteredCustomerDto;
 import com.fixinh.sbp.modules.auth.dto.internal.GoogleLoginCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.LoginCommand;
+import com.fixinh.sbp.modules.auth.dto.internal.LogoutCommand;
+import com.fixinh.sbp.modules.auth.dto.internal.RefreshCommand;
 import com.fixinh.sbp.modules.auth.dto.internal.RegisterCommand;
 
 /** What the auth controller may ask of the auth module (API Documentation Sections 4.1, 4.2). */
@@ -35,4 +37,16 @@ public interface AuthExternalService {
 	 *         AUTH_ACCOUNT_DEACTIVATED
 	 */
 	AuthTokenDto loginWithGoogle(GoogleLoginCommand command);
+
+	/**
+	 * Exchanges a refresh token for a new access token and a new refresh token (rotation).
+	 *
+	 * @throws com.fixinh.sbp.common.exception.ApiException AUTH_REFRESH_TOKEN_INVALID,
+	 *         AUTH_REFRESH_TOKEN_EXPIRED, or AUTH_ACCOUNT_DEACTIVATED
+	 */
+	AuthTokenDto refresh(RefreshCommand command);
+
+	/** Revokes the access token that authenticated this request and clears the account's
+	 * refresh token. Idempotent: calling it twice is not an error. */
+	void logout(LogoutCommand command);
 }

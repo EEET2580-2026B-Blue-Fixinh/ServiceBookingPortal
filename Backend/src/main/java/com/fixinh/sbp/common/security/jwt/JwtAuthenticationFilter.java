@@ -16,6 +16,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.security.Role;
+import com.fixinh.sbp.common.security.blacklist.TokenBlacklistRepository;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -40,6 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtTokenProvider tokenProvider;
 
+	private final TokenBlacklistRepository tokenBlacklistRepository;
+
 	/**
 	 * Filters run before the DispatcherServlet, so @RestControllerAdvice never sees exceptions
 	 * thrown here. Handing them to the resolver routes them back through it.
@@ -60,10 +63,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		try {
 			Claims claims = tokenProvider.parseAndValidate(header.substring(BEARER_PREFIX.length()));
 
+			if (tokenBlacklistRepository.isBlacklisted(claims.getId())) {
+				SecurityContextHolder.clearContext();
+				handlerExceptionResolver.resolveException(request, response, null,
+						new ApiException(ErrorCode.AUTH_TOKEN_REVOKED));
+				return;
+			}
+
 			UserPrincipal principal = new UserPrincipal(
 					claims.getSubject(),
 					JwtTokenProvider.emailOf(claims),
-					Role.valueOf(JwtTokenProvider.roleOf(claims)));
+					Role.valueOf(JwtTokenProvider.roleOf(claims)),
+					claims.getId(),
+					claims.getExpiration().toInstant());
 
 			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 					principal, null, List.of(new SimpleGrantedAuthority(principal.authority())));
