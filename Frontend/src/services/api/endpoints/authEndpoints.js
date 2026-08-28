@@ -40,3 +40,28 @@ export function googleLogin(payload) {
     auth: false,
   });
 }
+
+/**
+ * POST /auth/refresh. No stored access token is sent — it has likely already
+ * expired, which is why this is being called — only the refresh token, in the
+ * body. Returns a new `{ accessToken, expiresIn, refreshToken, ... }` pair; the
+ * refresh token rotates on every call, so the old one stops working immediately.
+ *
+ * @param {string} refreshToken
+ */
+export function refresh(refreshToken) {
+  return apiClient.post(
+    API_ENDPOINTS.AUTH.REFRESH,
+    { refreshToken },
+    { auth: false },
+  );
+}
+
+/**
+ * POST /auth/logout. Requires the current access token — that token is the one
+ * thing being revoked, so there is no other way to tell the server which one to
+ * blacklist.
+ */
+export function logout() {
+  return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, undefined);
+}
