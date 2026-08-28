@@ -1,9 +1,14 @@
 export const AUTH_TOKEN_KEY = "sb_auth_token";
 export const AUTH_USER_KEY = "sb_auth_user";
 
-// When the access token dies, as a millisecond epoch. Req 3.2.M1: there is no
-// refresh token, so this deadline is the whole of the session's lifetime.
+// When the access token dies, as a millisecond epoch. The session itself outlives
+// this — see AUTH_REFRESH_TOKEN_KEY — but it is the deadline the access token's own
+// timer enforces.
 export const AUTH_EXPIRES_AT_KEY = "sb_auth_expires_at";
+
+// Opaque, single-use-until-rotated. Exchanged at /auth/refresh for a new access
+// token without asking the user to sign in again.
+export const AUTH_REFRESH_TOKEN_KEY = "sb_auth_refresh_token";
 
 // Roles the backend issues in the JWT (API Documentation Appendix A).
 export const ROLES = {
@@ -40,6 +45,7 @@ export const ROUTES = {
 export const SESSION_ENDING_ERROR_CODES = [
   "AUTH_TOKEN_EXPIRED",
   "AUTH_TOKEN_INVALID",
+  "AUTH_TOKEN_REVOKED",
 ];
 
 // Shown on the login page after a forced sign-out. Client-side because the timer

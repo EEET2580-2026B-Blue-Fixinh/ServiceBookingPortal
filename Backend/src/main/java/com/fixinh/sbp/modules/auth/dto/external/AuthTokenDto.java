@@ -19,6 +19,8 @@ public record AuthTokenDto(
 		String tokenType,
 		/** Seconds until the token expires. */
 		long expiresIn,
+		/** Opaque, single-use-until-rotated. Exchanged at /auth/refresh for a new pair. */
+		String refreshToken,
 		AuthUserDto user,
 		/** True if this sign-in just created a new account (Google OAuth only). */
 		Boolean accountCreated,
@@ -39,7 +41,8 @@ public record AuthTokenDto(
 			String accessToken,
 			String tokenType,
 			long expiresIn,
+			String refreshToken,
 			AuthUserDto user) {
-		this(accessToken, tokenType, expiresIn, user, null, null, null);
+		this(accessToken, tokenType, expiresIn, refreshToken, user, null, null, null);
 	}
 }

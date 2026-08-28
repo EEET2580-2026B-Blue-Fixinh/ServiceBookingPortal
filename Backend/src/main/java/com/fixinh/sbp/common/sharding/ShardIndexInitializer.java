@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 
+import com.fixinh.sbp.common.security.blacklist.BlacklistedToken;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.admin.model.Administrator;
@@ -53,6 +54,28 @@ public class ShardIndexInitializer {
         ensureBookingIndexes(south, Region.SOUTH);
         ensureBookingIndexes(north, Region.NORTH);
         ensureAdministratorIndexes(south);
+        ensureBlacklistIndexes(south, Region.SOUTH);
+        ensureBlacklistIndexes(north, Region.NORTH);
+    }
+
+    /**
+     * TTL index for revoked access tokens: a document is removed at (or shortly after — Mongo's
+     * TTL monitor runs roughly every 60s) {@code expiresAt}, which is the original access
+     * token's own expiry. This is the whole mechanism that makes the blacklist self-cleaning —
+     * without it, revoked tokens would accumulate forever instead of expiring.
+     */
+    private void ensureBlacklistIndexes(MongoTemplate template, Region region) {
+        try {
+            template.indexOps(BlacklistedToken.class)
+                    .createIndex(new Index().on("expiresAt", Sort.Direction.ASC)
+                            .expire(java.time.Duration.ZERO));
+            log.info("Blacklist TTL index ensured on {} shard ({})", region,
+                    template.getDb().getName());
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure blacklist TTL index on {} shard — revoked tokens will "
+                    + "accumulate instead of expiring until this succeeds", region, ex);
+        }
     }
 
     private void ensureBookingIndexes(MongoTemplate template, Region region) {

@@ -1,15 +1,26 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { AUTH_EXPIRES_AT_KEY, AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../config/constants'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import {
+  AUTH_EXPIRES_AT_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
+  AUTH_TOKEN_KEY,
+  AUTH_USER_KEY,
+} from '../config/constants'
 import { setUnauthorizedHandler } from '../services/api/apiClient'
+import { logout as requestLogout, refresh as requestRefresh } from '../services/api/endpoints/authEndpoints'
 
-// Req 3.2.M1: the backend issues an access token with a fixed lifetime and no
-// refresh token, so when it expires the only path forward is signing in again.
-// This provider owns that deadline: it is the only module that writes or reads
-// AUTH_EXPIRES_AT_KEY, so the arithmetic and the comparison cannot drift apart.
+// The access token has a fixed lifetime; the refresh token is what lets a session
+// outlive it without asking the user to sign in again. This provider owns both
+// deadlines: it is the only module that writes or reads AUTH_EXPIRES_AT_KEY and
+// AUTH_REFRESH_TOKEN_KEY, so the arithmetic and the comparison cannot drift apart.
 
 const AuthContext = createContext(undefined)
 
-const AUTH_KEYS = [AUTH_TOKEN_KEY, AUTH_USER_KEY, AUTH_EXPIRES_AT_KEY]
+const AUTH_KEYS = [AUTH_TOKEN_KEY, AUTH_REFRESH_TOKEN_KEY, AUTH_USER_KEY, AUTH_EXPIRES_AT_KEY]
+
+// Refresh this many milliseconds before the access token would actually expire, so
+// the round trip to /auth/refresh completes while the old token is still technically
+// valid rather than racing its deadline.
+const REFRESH_LEAD_MS = 30_000
 
 // One frozen object per terminal state. Reusing the same reference is what makes a
 // second expireSession() call — from a second request that also 401'd — a no-op:
@@ -60,7 +71,18 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(readStoredSession)
   const { token, expiresAt } = session
 
+  // Guards against a timer and a visibilitychange recheck both firing near the same
+  // moment: the refresh token rotates on every use and the backend treats a reused
+  // one as theft, revoking the session — so two concurrent refresh calls would sign
+  // the user out instead of silently extending things.
+  const refreshingRef = useRef(false)
+
   const logout = useCallback(() => {
+    // Best-effort: fired without waiting on it, so a user closing their laptop
+    // mid-request is never blocked from clearing their own local session. The
+    // server-side blacklist entry not landing just means this token dies naturally
+    // at its own expiry instead of immediately — not a broken sign-out.
+    requestLogout().catch(() => {})
     clearStoredSession()
     setSession(NO_SESSION)
   }, [])
@@ -71,42 +93,66 @@ export function AuthProvider({ children }) {
     setSession(EXPIRED_SESSION)
   }, [])
 
-  const login = (nextToken, nextUser, expiresInSeconds) => {
+  const login = useCallback((nextToken, nextRefreshToken, nextUser, expiresInSeconds) => {
     // The server reports a lifetime in seconds; store the wall-clock deadline so a
     // reload — or a second tab — can tell how much of it is left. Derived from this
     // browser's clock rather than the token's own `exp` claim on purpose: measuring
     // a duration locally means a constant offset against the server cancels out,
     // whereas comparing server time to Date.now() would sign a user whose clock is
     // ten minutes slow out ten minutes early, every session.
-    const expiresAt =
+    const nextExpiresAt =
       Number.isFinite(expiresInSeconds) && expiresInSeconds > 0
         ? Date.now() + expiresInSeconds * 1000
         : null
 
     localStorage.setItem(AUTH_TOKEN_KEY, nextToken)
+    localStorage.setItem(AUTH_REFRESH_TOKEN_KEY, nextRefreshToken)
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser))
-    if (expiresAt === null) localStorage.removeItem(AUTH_EXPIRES_AT_KEY)
-    else localStorage.setItem(AUTH_EXPIRES_AT_KEY, String(expiresAt))
+    if (nextExpiresAt === null) localStorage.removeItem(AUTH_EXPIRES_AT_KEY)
+    else localStorage.setItem(AUTH_EXPIRES_AT_KEY, String(nextExpiresAt))
 
-    setSession({ token: nextToken, user: nextUser, expiresAt, expired: false })
-  }
+    setSession({ token: nextToken, user: nextUser, expiresAt: nextExpiresAt, expired: false })
+  }, [])
 
-  // Expiry must sign the user out the moment it happens, not on the next API call.
-  // Nothing is guaranteed to render or fetch while someone reads a page, so a timer
-  // is the only thing that can make it immediate.
+  // Tries to extend the session with the stored refresh token before giving up on
+  // it. Falls back to expireSession() whenever that is not possible — no refresh
+  // token on hand, or the backend rejects the one stored (already rotated away,
+  // expired, or the account was deactivated).
+  const attemptRefresh = useCallback(async () => {
+    if (refreshingRef.current) return
+    const storedRefreshToken = localStorage.getItem(AUTH_REFRESH_TOKEN_KEY)
+    if (!storedRefreshToken) {
+      expireSession()
+      return
+    }
+
+    refreshingRef.current = true
+    try {
+      const renewed = await requestRefresh(storedRefreshToken)
+      login(renewed.accessToken, renewed.refreshToken, renewed.user, renewed.expiresIn)
+    } catch {
+      expireSession()
+    } finally {
+      refreshingRef.current = false
+    }
+  }, [expireSession, login])
+
+  // A silent refresh must happen before the access token's deadline, not after —
+  // nothing is guaranteed to render or fetch while someone just reads a page, so a
+  // timer is the only thing that can make it happen without a user-visible gap.
   useEffect(() => {
     if (!token || expiresAt === null) return
 
     // Math.max keeps the delay non-negative, which also covers a deadline that has
-    // already passed: the sign-out lands on the next tick rather than as a setState
-    // run synchronously inside this effect.
-    const timerId = setTimeout(expireSession, Math.max(0, expiresAt - Date.now()))
+    // already passed: the refresh attempt lands on the next tick rather than as a
+    // setState run synchronously inside this effect.
+    const timerId = setTimeout(attemptRefresh, Math.max(0, expiresAt - REFRESH_LEAD_MS - Date.now()))
 
     // setTimeout is suspended while the machine sleeps and throttled in a tab hidden
     // for more than a few minutes, so it can run late. The deadline is wall-clock, so
     // re-checking on return is always safe and never early.
     const recheck = () => {
-      if (Date.now() >= expiresAt) expireSession()
+      if (Date.now() >= expiresAt - REFRESH_LEAD_MS) attemptRefresh()
     }
     document.addEventListener('visibilitychange', recheck)
 
@@ -114,11 +160,12 @@ export function AuthProvider({ children }) {
       clearTimeout(timerId)
       document.removeEventListener('visibilitychange', recheck)
     }
-  }, [token, expiresAt, expireSession])
+  }, [token, expiresAt, attemptRefresh])
 
   // apiClient cannot use hooks, so it calls back in here when the backend rejects
-  // our token. Registered in an effect rather than at module load so the handler is
-  // always the live provider's, and is torn down with it.
+  // our token (including AUTH_TOKEN_REVOKED, e.g. this same account signed out from
+  // another tab). Registered in an effect rather than at module load so the handler
+  // is always the live provider's, and is torn down with it.
   useEffect(() => {
     setUnauthorizedHandler(expireSession)
     return () => setUnauthorizedHandler(null)

@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { AdminShell } from '../../components/admin/AdminShell'
 import { MaterialIcon } from '../../components/shared/icons'
+import { Toast } from '../../components/shared/Toast'
 import { useAuth } from '../../context/AuthContext'
 
 const QUICK_LINKS = [
@@ -38,9 +40,17 @@ function QuickLinkCard({ to, icon, title, description }) {
 
 export function AdminHomePage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const [showWelcome, setShowWelcome] = useState(Boolean(location.state?.justSignedIn))
 
   return (
     <AdminShell activeNav="dashboard" breadcrumb="Admin Portal" title="Dashboard">
+      {showWelcome && (
+        <Toast
+          message={`Welcome back${user?.fullName ? `, ${user.fullName}` : ""}!`}
+          onDismiss={() => setShowWelcome(false)}
+        />
+      )}
       <div className="mb-[18px] grid grid-cols-2 gap-3.5 max-[700px]:grid-cols-1">
         {QUICK_LINKS.map((link) => (
           <QuickLinkCard key={link.to} {...link} />

@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { BookingShell } from "../../components/booking/BookingShell";
 import { StatusBadge } from "../../components/booking/StatusBadge";
 import { StarRating } from "../../components/booking/StarRating";
 import { MaterialIcon } from "../../components/shared/icons";
 import { SelectField } from "../../components/shared/form/SelectField/SelectField";
+import { Toast } from "../../components/shared/Toast";
 import {
   MOCK_BOOKINGS,
   SERVICE_ICON_BY_LABEL,
@@ -133,7 +135,11 @@ function BookingSection({ title, dotClassName, count, bookings }) {
 export function MyBookingsPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [showWelcome, setShowWelcome] = useState(
+    Boolean(location.state?.justSignedIn),
+  );
 
   const setFilter = (key) => (value) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -172,6 +178,12 @@ export function MyBookingsPage() {
         </button>
       }
     >
+      {showWelcome && (
+        <Toast
+          message={`Welcome back${user?.fullName ? `, ${user.fullName}` : ""}!`}
+          onDismiss={() => setShowWelcome(false)}
+        />
+      )}
       {location.state?.googleAccountLinked && (
         <p
           className="mb-4 rounded-lg bg-bk-teal-soft px-4 py-3 text-sm font-semibold text-bk-teal-strong"

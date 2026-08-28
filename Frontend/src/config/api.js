@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
     REGISTER: "/auth/register",
     LOGIN: "/auth/login",
     GOOGLE_LOGIN: "/auth/oauth/google", // Section 4.3: Google OAuth sign-in
+    REFRESH: "/auth/refresh", // Exchanges a refresh token for a new access token
+    LOGOUT: "/auth/logout", // Revokes the caller's own access token immediately
   },
 
   CUSTOMERS: {

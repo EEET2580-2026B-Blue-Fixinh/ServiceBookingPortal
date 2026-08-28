@@ -87,7 +87,12 @@ export function LoginPage() {
           });
 
           // Start session immediately so user is authenticated
-          startSession(session.accessToken, session.user, session.expiresIn);
+          startSession(
+            session.accessToken,
+            session.refreshToken,
+            session.user,
+            session.expiresIn,
+          );
 
           // Check if profile completion is required
           if (session.profileCompletionRequired) {
@@ -106,9 +111,10 @@ export function LoginPage() {
 
           navigate(canReturn ? intended : home, {
             replace: true,
-            state: session.providerLinked
-              ? { googleAccountLinked: true }
-              : undefined,
+            state: {
+              justSignedIn: true,
+              ...(session.providerLinked ? { googleAccountLinked: true } : {}),
+            },
           });
         } catch (error) {
           setFormError(
@@ -161,7 +167,12 @@ export function LoginPage() {
 
       // expiresIn is the token's lifetime in seconds; the context turns it into the
       // deadline it enforces, so a forced sign-out can happen without an API call.
-      startSession(session.accessToken, session.user, session.expiresIn);
+      startSession(
+        session.accessToken,
+        session.refreshToken,
+        session.user,
+        session.expiresIn,
+      );
 
       // Where this account belongs when it has nowhere else to be: /booking lists
       // the caller's own bookings, which an administrator does not have.
@@ -176,7 +187,10 @@ export function LoginPage() {
       const canReturn =
         intended && intended.startsWith(ROUTES.ADMIN) === isAdmin;
 
-      navigate(canReturn ? intended : home, { replace: true });
+      navigate(canReturn ? intended : home, {
+        replace: true,
+        state: { justSignedIn: true },
+      });
     } catch (error) {
       // The backend answers an unknown identifier and a wrong password
       // identically on purpose, so there is one message to show for both.

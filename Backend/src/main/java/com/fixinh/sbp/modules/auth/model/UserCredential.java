@@ -94,4 +94,7 @@ public class UserCredential {
 	 * store by default.
 	 */
 	private Region homeRegion;
+
+	/** The account's one active refresh token; null when signed out or never signed in. */
+	private RefreshTokenRecord refreshToken;
 }
