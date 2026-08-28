@@ -111,9 +111,10 @@ export function LoginPage() {
 
           navigate(canReturn ? intended : home, {
             replace: true,
-            state: session.providerLinked
-              ? { googleAccountLinked: true }
-              : undefined,
+            state: {
+              justSignedIn: true,
+              ...(session.providerLinked ? { googleAccountLinked: true } : {}),
+            },
           });
         } catch (error) {
           setFormError(
@@ -186,7 +187,10 @@ export function LoginPage() {
       const canReturn =
         intended && intended.startsWith(ROUTES.ADMIN) === isAdmin;
 
-      navigate(canReturn ? intended : home, { replace: true });
+      navigate(canReturn ? intended : home, {
+        replace: true,
+        state: { justSignedIn: true },
+      });
     } catch (error) {
       // The backend answers an unknown identifier and a wrong password
       // identically on purpose, so there is one message to show for both.
