@@ -78,6 +78,12 @@ public enum ErrorCode {
 	SMP_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
 			"The booking service is temporarily unavailable. Please try again."),
 
+	// --- Top-level: booking history (API Documentation §7.2, Req 3.3.M2–M6) ---
+	INVALID_SORT_FIELD(HttpStatus.BAD_REQUEST,
+			"Only createdAt can be used to sort bookings."),
+	INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST,
+			"createdFrom must not be later than createdTo."),
+
 	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
 			"The staff account was created, but the welcome email could not be sent. "
 					+ "It will be retried automatically."),

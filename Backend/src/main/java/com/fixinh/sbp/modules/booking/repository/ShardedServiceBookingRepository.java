@@ -1,17 +1,14 @@
 package com.fixinh.sbp.modules.booking.repository;
-
+import java.util.List;
 import java.util.Optional;
-
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
-
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.ShardMongoConfig;
 import com.fixinh.sbp.modules.booking.model.ServiceBooking;
-
 /**
  * Reads and writes bookings across the north and south stores.
  *
@@ -22,10 +19,8 @@ import com.fixinh.sbp.modules.booking.model.ServiceBooking;
  */
 @Repository
 public class ShardedServiceBookingRepository implements ServiceBookingRepository {
-
 	private final MongoTemplate south;
 	private final MongoTemplate north;
-
 	public ShardedServiceBookingRepository(
 			@Qualifier(ShardMongoConfig.SOUTH_TEMPLATE) MongoTemplate south,
 			@Qualifier(ShardMongoConfig.NORTH_TEMPLATE) MongoTemplate north) {
@@ -53,7 +48,6 @@ public class ShardedServiceBookingRepository implements ServiceBookingRepository
 	@Override
 	public Optional<ServiceBooking> findByBookingRef(String bookingRef) {
 		Query query = Query.query(Criteria.where("bookingRef").is(bookingRef));
-
 		ServiceBooking found = south.findOne(query, ServiceBooking.class);
 		if (found == null) {
 			found = north.findOne(query, ServiceBooking.class);
@@ -61,6 +55,11 @@ public class ShardedServiceBookingRepository implements ServiceBookingRepository
 		return Optional.ofNullable(found);
 	}
 
+	@Override
+	public List<ServiceBooking> findByCustomerId(String customerId, Region homeRegion) {
+		Query query = Query.query(Criteria.where("customerId").is(customerId));
+		return templateFor(homeRegion).find(query, ServiceBooking.class);
+	}
 	private MongoTemplate templateFor(Region region) {
 		return region == Region.SOUTH ? south : north;
 	}
