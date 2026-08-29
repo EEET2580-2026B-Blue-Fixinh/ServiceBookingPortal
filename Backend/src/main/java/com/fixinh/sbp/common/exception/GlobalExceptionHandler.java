@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.fixinh.sbp.common.dto.ErrorResponse;
 
@@ -46,6 +47,24 @@ public class GlobalExceptionHandler {
 				.toList();
 
 		return build(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.getMessage(), violations,
+				request);
+	}
+
+	/**
+	 * A multipart request larger than {@code spring.servlet.multipart.*} allows.
+	 *
+	 * <p>Container-level, so it is raised before any controller or validator sees the request —
+	 * without this it would land in {@link #handleUnexpected} and a five-and-a-half megabyte
+	 * photograph would come back as 500, not the 413 §7.4 promises. The configured cap sits
+	 * deliberately above the 5 MB rule so {@code BookingCancelValidator} normally answers first
+	 * with a message naming the actual limit; this is the backstop for a request too large to
+	 * reach it at all.
+	 */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex,
+			HttpServletRequest request) {
+
+		return build(ErrorCode.FILE_TOO_LARGE, ErrorCode.FILE_TOO_LARGE.getMessage(), List.of(),
 				request);
 	}
 

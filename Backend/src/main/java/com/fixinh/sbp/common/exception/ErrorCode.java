@@ -84,6 +84,24 @@ public enum ErrorCode {
 	INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST,
 			"createdFrom must not be later than createdTo."),
 
+	// --- Top-level: booking cancellation (API Documentation §7.4, Req 3.3.M1) ---
+	/**
+	 * Also the answer when the reference belongs to another customer. §7.3 makes the two
+	 * indistinguishable on purpose, so a reference cannot be probed for existence.
+	 */
+	BOOKING_NOT_FOUND(HttpStatus.NOT_FOUND,
+			"No booking exists with this reference."),
+	BOOKING_NOT_CANCELLABLE(HttpStatus.CONFLICT,
+			"This booking is already completed, cancelled or aborted, so it cannot be cancelled."),
+	TOO_MANY_IMAGES(HttpStatus.BAD_REQUEST,
+			"At most three images may be attached."),
+	FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE,
+			"Each image must be 5 MB or smaller."),
+	UNSUPPORTED_FILE_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+			"Only JPEG and PNG images are accepted."),
+	UPLOAD_FAILED(HttpStatus.BAD_GATEWAY,
+			"The images could not be uploaded, so nothing was changed. Please try again."),
+
 	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
 			"The staff account was created, but the welcome email could not be sent. "
 					+ "It will be retried automatically."),

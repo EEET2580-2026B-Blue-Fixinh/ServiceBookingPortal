@@ -23,6 +23,8 @@ public class SbpProperties {
 	private Smp smp = new Smp();
 	private Email email = new Email();
 	private OAuth oauth = new OAuth();
+	private Images images = new Images();
+	private Cloudinary cloudinary = new Cloudinary();
 
 	/** Req 3.2.M1-M3: access tokens issued on sign-in and validated on every protected call. */
 	@Getter
@@ -178,5 +180,53 @@ public class SbpProperties {
 			/** Sent through the provider configured under {@code spring.mail.*}. */
 			SMTP
 		}
+	}
+
+	/**
+	 * Reqs 3.3.M1, 3.4.M1: evidence images attached to a cancellation or a rating.
+	 *
+	 * <p>Policy only, in the same split as {@link Email}: which implementation runs is decided
+	 * here, while the Cloudinary credential lives in {@link Cloudinary} so the account details
+	 * are not tangled with the choice of where images go.
+	 */
+	@Getter
+	@Setter
+	public static class Images {
+
+		/**
+		 * Which {@code ImageStorageService} is active. Defaults to {@link Mode#LOCAL} for the
+		 * same reason email defaults to writing files: a half-configured environment must fall
+		 * into the implementation that touches nothing outside the machine, never into the one
+		 * that publishes images to the internet.
+		 */
+		private Mode mode = Mode.LOCAL;
+
+		/**
+		 * Where {@link Mode#LOCAL} writes. Under {@code target/} deliberately — {@code
+		 * .gitignore} already covers it, and {@code mvn clean} discards evidence images rather
+		 * than leaving customer photographs in the working tree.
+		 */
+		private String localDirectory = "target/uploads";
+
+		/** Where an uploaded image is kept. */
+		public enum Mode {
+			/** Written under {@link Images#localDirectory}. Nothing leaves the machine. */
+			LOCAL,
+			/** Uploaded to the Cloudinary account in {@link Cloudinary}. */
+			CLOUDINARY
+		}
+	}
+
+	/**
+	 * Req 3.3.M1, 3.4.M1: the Cloudinary account images are relayed to. Read only when
+	 * {@code fixinh.sbp.images.mode} is {@code cloudinary}; blank otherwise, which is the
+	 * default everywhere.
+	 */
+	@Getter
+	@Setter
+	public static class Cloudinary {
+		private String cloudName;
+		private String apiKey;
+		private String apiSecret;
 	}
 }
