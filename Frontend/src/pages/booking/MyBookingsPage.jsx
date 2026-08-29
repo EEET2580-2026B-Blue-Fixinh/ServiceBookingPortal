@@ -1,119 +1,114 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { BookingShell } from "../../components/booking/BookingShell";
 import { StatusBadge } from "../../components/booking/StatusBadge";
-import { StarRating } from "../../components/booking/StarRating";
+import {
+  buildMeta,
+  buildSchedule,
+  formatMoney,
+  iconResolver,
+} from "../../components/booking/bookingPresentation";
 import { MaterialIcon } from "../../components/shared/icons";
 import { SelectField } from "../../components/shared/form/SelectField/SelectField";
 import { Toast } from "../../components/shared/Toast";
-import {
-  MOCK_BOOKINGS,
-  SERVICE_ICON_BY_LABEL,
-  SERVICE_TYPES,
-} from "./mockBookings";
+import { useMyBookings } from "../../hooks/useMyBookings";
+import { fetchRepairServices } from "../../services/api/endpoints/referenceEndpoints";
 
-const SERVICE_OPTIONS = [
-  "All services",
-  ...SERVICE_TYPES.map((service) => service.label),
+const ALL_SERVICES = "All services";
+
+// Section 7.2 accepts exactly these two. The label is what the customer picks; the value
+// is what goes on the wire, so no part of the UI has to know the sort syntax.
+const SORT_OPTIONS = [
+  { label: "Newest first", value: "createdAt,desc" },
+  { label: "Oldest first", value: "createdAt,asc" },
 ];
-const SORT_OPTIONS = ["Newest first", "Oldest first"];
 
 const INITIAL_FILTERS = {
   search: "",
-  serviceType: "All services",
+  serviceName: ALL_SERVICES,
   createdFrom: "",
   createdTo: "",
-  sort: "Newest first",
+  sort: SORT_OPTIONS[0].label,
 };
+
+// Long enough that a typed word is one request, short enough to feel immediate.
+const SEARCH_DEBOUNCE_MS = 350;
 
 const DATE_INPUT_CLASS =
   "rounded-[9px] border border-bk-border bg-white px-3 py-2.5 font-[inherit] text-bk-text " +
   "focus:border-bk-teal focus:outline-none focus:ring-[3px] focus:ring-bk-teal-soft";
 
-function matchesFilters(booking, filters) {
-  const search = filters.search.trim().toLowerCase();
-  if (search) {
-    const haystack = [booking.id, ...booking.technicians]
-      .join(" ")
-      .toLowerCase();
-    if (!haystack.includes(search)) return false;
-  }
+function BookingCard({ booking, iconFor }) {
+  const schedule = buildSchedule(booking);
+  const total = formatMoney(booking.totalCost);
 
-  if (
-    filters.serviceType !== "All services" &&
-    booking.serviceLabel !== filters.serviceType
-  ) {
-    return false;
-  }
-
-  if (filters.createdFrom && booking.createdDate < filters.createdFrom)
-    return false;
-  if (filters.createdTo && booking.createdDate > filters.createdTo)
-    return false;
-
-  return true;
-}
-
-function BookingCard({ booking }) {
   return (
     <article className="flex items-center gap-4 rounded-xl border border-bk-border bg-bk-surface px-[18px] py-4 max-[700px]:flex-wrap">
       <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] bg-bk-bg text-bk-text">
         <MaterialIcon
-          name={SERVICE_ICON_BY_LABEL[booking.serviceLabel]}
+          name={iconFor(booking.serviceId)}
           className="text-[21px]"
         />
       </span>
 
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-baseline gap-2 text-[15.5px] font-bold text-bk-text">
-          {booking.serviceLabel}
+          {booking.serviceName}
           <span className="font-mono text-[12.5px] font-medium text-bk-muted">
-            {booking.id}
+            {booking.bookingRef}
           </span>
         </span>
         <span className="truncate text-[13px] text-bk-muted">
-          {booking.meta}
+          {buildMeta(booking)}
         </span>
       </span>
 
-      {booking.schedule && (
+      {schedule && (
         <span className="flex shrink-0 items-center gap-2.5 rounded-[10px] bg-bk-teal-soft px-[14px] py-[9px] text-bk-teal-strong">
           <MaterialIcon
             name="event_available"
             className="text-xl text-bk-teal"
           />
           <span className="flex flex-col leading-[1.3]">
-            <span className="text-[13.5px] font-bold">
-              {booking.schedule.label}
-            </span>
-            <span className="text-[12.5px] text-bk-teal-strong opacity-85">
-              {booking.technicians.join(", ")}
-            </span>
+            <span className="text-[13.5px] font-bold">{schedule.label}</span>
+            {schedule.technicians.length > 0 && (
+              <span className="text-[12.5px] text-bk-teal-strong opacity-85">
+                {schedule.technicians.join(", ")}
+              </span>
+            )}
           </span>
         </span>
       )}
 
       <span className="ml-auto flex shrink-0 items-center gap-3.5 max-[700px]:ml-0 max-[700px]:w-full max-[700px]:justify-between max-[700px]:pl-[58px]">
-        {booking.total && (
+        {total && (
           <span className="flex flex-col items-end leading-[1.3]">
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-bk-muted">
               Total
             </span>
-            <span className="text-[14.5px] font-bold text-bk-text">
-              {booking.total}
-            </span>
+            <span className="text-[14.5px] font-bold text-bk-text">{total}</span>
           </span>
         )}
         <StatusBadge status={booking.status} />
-        {booking.rating != null && <StarRating value={booking.rating} />}
+        {/* Section 7.2 publishes hasRating, a boolean — not the score. Stars would need a
+            second request per row, which is the cost hasRating exists to avoid. The rating
+            screens are not built yet, so this stays a flag until they are. */}
+        {booking.hasRating && (
+          <MaterialIcon
+            name="star"
+            filled
+            className="text-xl text-bk-amber"
+            title="You have rated this booking"
+          />
+        )}
         <MaterialIcon name="chevron_right" className="text-xl text-bk-muted" />
       </span>
     </article>
   );
 }
 
-function BookingSection({ title, dotClassName, count, bookings }) {
+function BookingSection({ title, dotClassName, bookings, iconFor }) {
   if (bookings.length === 0) return null;
 
   return (
@@ -121,11 +116,15 @@ function BookingSection({ title, dotClassName, count, bookings }) {
       <h2 className="mb-3 flex items-center gap-2 text-[15px] font-bold text-bk-text">
         <span className={`h-2 w-2 rounded-full ${dotClassName}`} />
         {title}
-        <span className="font-semibold text-bk-muted">{count}</span>
+        <span className="font-semibold text-bk-muted">{bookings.length}</span>
       </h2>
       <div className="flex flex-col gap-2.5">
         {bookings.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} />
+          <BookingCard
+            key={booking.bookingRef}
+            booking={booking}
+            iconFor={iconFor}
+          />
         ))}
       </div>
     </section>
@@ -136,31 +135,92 @@ export function MyBookingsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [services, setServices] = useState([]);
   const [showWelcome, setShowWelcome] = useState(
     Boolean(location.state?.justSignedIn),
   );
 
-  const setFilter = (key) => (value) =>
+  const setFilter = (key) => (value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    // Any change to what is being asked for invalidates which page we were on: page 3 of
+    // the old result set is not page 3 of the new one.
+    setPage(0);
+  };
 
-  const filtered = useMemo(() => {
-    const matched = MOCK_BOOKINGS.filter((booking) =>
-      matchesFilters(booking, filters),
-    );
-    const sorted = [...matched].sort((a, b) =>
-      filters.sort === "Newest first"
-        ? b.createdDate.localeCompare(a.createdDate)
-        : a.createdDate.localeCompare(b.createdDate),
-    );
-    return {
-      active: sorted.filter((booking) => booking.group === "active"),
-      past: sorted.filter((booking) => booking.group === "past"),
+  // The filter dropdown asks for inactive services too (Section 5.2's own note), so a
+  // booking made before a service was retired can still be filtered for by name.
+  useEffect(() => {
+    let cancelled = false;
+    fetchRepairServices({ activeOnly: false })
+      .then((items) => {
+        if (!cancelled) setServices(items);
+      })
+      .catch(() => {
+        // A failed catalogue costs the dropdown its options, not the page its bookings.
+        if (!cancelled) setServices([]);
+      });
+    return () => {
+      cancelled = true;
     };
-  }, [filters]);
+  }, []);
 
-  const totalCount = filtered.active.length + filtered.past.length;
-  const hasResults = totalCount > 0;
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setDebouncedSearch(filters.search),
+      SEARCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  const serviceIdsByName = useMemo(() => {
+    const byName = new Map();
+    services.forEach((service) => {
+      const existing = byName.get(service.serviceName) ?? [];
+      byName.set(service.serviceName, [...existing, service.serviceId]);
+    });
+    return byName;
+  }, [services]);
+
+  const query = useMemo(
+    () => ({
+      q: debouncedSearch,
+      serviceIds: serviceIdsByName.get(filters.serviceName),
+      createdFrom: filters.createdFrom,
+      createdTo: filters.createdTo,
+      sort: SORT_OPTIONS.find((option) => option.label === filters.sort)?.value,
+      page,
+    }),
+    [
+      debouncedSearch,
+      serviceIdsByName,
+      filters.serviceName,
+      filters.createdFrom,
+      filters.createdTo,
+      filters.sort,
+      page,
+    ],
+  );
+
+  const { active, past, page: pageInfo, status, error, reload } =
+    useMyBookings(query);
+
+  const iconFor = useMemo(() => iconResolver(services), [services]);
+
+  const serviceOptions = useMemo(
+    () => [
+      ALL_SERVICES,
+      ...[...new Set(services.map((service) => service.serviceName))].sort(),
+    ],
+    [services],
+  );
+
+  const totalElements = pageInfo?.totalElements ?? 0;
+  const totalPages = pageInfo?.totalPages ?? 0;
+  const hasResults = active.length > 0 || past.length > 0;
 
   return (
     <BookingShell
@@ -192,6 +252,7 @@ export function MyBookingsPage() {
           Your Google account is now linked to your Fixinh account.
         </p>
       )}
+
       <div className="mb-[18px] grid grid-cols-[minmax(220px,1.6fr)_repeat(4,minmax(140px,1fr))] gap-3.5 rounded-xl border border-bk-border bg-bk-surface p-[18px] max-[1100px]:grid-cols-2 max-[700px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-1.5">
           <label
@@ -225,9 +286,9 @@ export function MyBookingsPage() {
           </label>
           <SelectField
             id="bk-service-type"
-            value={filters.serviceType}
-            onChange={setFilter("serviceType")}
-            options={SERVICE_OPTIONS}
+            value={filters.serviceName}
+            onChange={setFilter("serviceName")}
+            options={serviceOptions}
           />
         </div>
 
@@ -274,42 +335,93 @@ export function MyBookingsPage() {
             id="bk-sort"
             value={filters.sort}
             onChange={setFilter("sort")}
-            options={SORT_OPTIONS}
+            options={SORT_OPTIONS.map((option) => option.label)}
           />
         </div>
       </div>
 
-      <p className="mb-[18px] font-mono text-[12.5px] text-bk-muted">
-        {totalCount} of {MOCK_BOOKINGS.length} bookings
-      </p>
-
-      {hasResults ? (
-        <>
-          <BookingSection
-            title="Active bookings"
-            dotClassName="bg-bk-teal"
-            count={filtered.active.length}
-            bookings={filtered.active}
-          />
-          <BookingSection
-            title="Past bookings"
-            dotClassName="bg-bk-muted"
-            count={filtered.past.length}
-            bookings={filtered.past}
-          />
-        </>
-      ) : (
-        <div className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-bk-border px-5 py-14 text-center text-bk-muted">
-          <MaterialIcon name="search_off" className="text-[32px]" />
-          <p>No bookings match your filters.</p>
+      {status === "error" ? (
+        <div className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-bk-red/40 px-5 py-14 text-center text-bk-muted">
+          <MaterialIcon name="error" className="text-[32px] text-bk-red" />
+          {/* Section 2.7: the backend writes the message, so the UI shows it rather than
+              inventing wording that would drift from the real rule. */}
+          <p className="font-semibold text-bk-text">{error?.message}</p>
           <button
             type="button"
-            onClick={() => setFilters(INITIAL_FILTERS)}
+            onClick={reload}
             className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal hover:border-bk-teal hover:bg-bk-teal-soft"
           >
-            Clear filters
+            Try again
           </button>
         </div>
+      ) : (
+        <>
+          <p className="mb-[18px] font-mono text-[12.5px] text-bk-muted">
+            {status === "loading"
+              ? "Loading bookings…"
+              : `${totalElements} booking${totalElements === 1 ? "" : "s"}`}
+          </p>
+
+          {hasResults ? (
+            <>
+              {/* Rendered in the order the server gave them. Section 7.2: active above
+                  past, createdAt within each — the frontend does not re-sort. */}
+              <BookingSection
+                title="Active bookings"
+                dotClassName="bg-bk-teal"
+                bookings={active}
+                iconFor={iconFor}
+              />
+              <BookingSection
+                title="Past bookings"
+                dotClassName="bg-bk-muted"
+                bookings={past}
+                iconFor={iconFor}
+              />
+
+              {totalPages > 1 && (
+                <nav className="flex items-center justify-center gap-4 pt-2">
+                  <button
+                    type="button"
+                    disabled={page === 0}
+                    onClick={() => setPage((current) => current - 1)}
+                    className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal disabled:cursor-not-allowed disabled:text-bk-muted disabled:opacity-60 enabled:hover:border-bk-teal enabled:hover:bg-bk-teal-soft"
+                  >
+                    Previous
+                  </button>
+                  <span className="font-mono text-[12.5px] text-bk-muted">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page + 1 >= totalPages}
+                    onClick={() => setPage((current) => current + 1)}
+                    className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal disabled:cursor-not-allowed disabled:text-bk-muted disabled:opacity-60 enabled:hover:border-bk-teal enabled:hover:bg-bk-teal-soft"
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
+            </>
+          ) : (
+            status === "ready" && (
+              <div className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-bk-border px-5 py-14 text-center text-bk-muted">
+                <MaterialIcon name="search_off" className="text-[32px]" />
+                <p>No bookings match your filters.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters(INITIAL_FILTERS);
+                    setPage(0);
+                  }}
+                  className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal hover:border-bk-teal hover:bg-bk-teal-soft"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )
+          )}
+        </>
       )}
     </BookingShell>
   );

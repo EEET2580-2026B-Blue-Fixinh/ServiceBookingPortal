@@ -43,6 +43,9 @@ export const API_ENDPOINTS = {
   // take a customer id, the same reason CUSTOMERS.MY_ADDRESS above has none.
   BOOKINGS: {
     CREATE: "/bookings",
+    // Same path, different method (Section 7.2). The rule this file states is that the
+    // whole URL is readable on one line, not that two lines may never share one.
+    LIST: "/bookings",
   },
   // The signed-in caller's own notifications (API Documentation Section 9). Every
   // one of these acts on whoever the token names; none of them takes a recipient.
