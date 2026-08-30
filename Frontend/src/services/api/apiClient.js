@@ -53,7 +53,14 @@ export function setUnauthorizedHandler(handler) {
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = {}
 
-  if (body !== undefined) {
+  // The endpoints that upload images send FormData (Sections 7.4 and 8.1). Two things
+  // must not happen to it: it must not be stringified, and Content-Type must be left
+  // alone. The browser writes that header itself, including the multipart boundary the
+  // server needs to split the parts — set it here and the boundary goes missing, which
+  // the backend reports as a malformed request rather than as a missing header.
+  const isFormData = body instanceof FormData
+
+  if (body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
 
@@ -71,7 +78,7 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined || isFormData ? body : JSON.stringify(body),
     })
   } catch {
     // Offline, DNS failure, CORS rejection, or the backend simply is not running.

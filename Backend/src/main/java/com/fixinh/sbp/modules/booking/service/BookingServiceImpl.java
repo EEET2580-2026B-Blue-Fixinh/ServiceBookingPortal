@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import com.fixinh.sbp.common.dto.PageResponse;
@@ -21,6 +22,7 @@ import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
 import com.fixinh.sbp.common.storage.ImageStorageService;
 import com.fixinh.sbp.common.storage.ImageUploadException;
 import com.fixinh.sbp.modules.booking.dto.external.BookingCancellationDto;
+import com.fixinh.sbp.modules.booking.dto.external.BookingDetailDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListItemDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListResponse;
 import com.fixinh.sbp.modules.booking.dto.external.BookingSummaryDto;
@@ -28,12 +30,15 @@ import com.fixinh.sbp.modules.booking.dto.internal.BookingCancelCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingCreateCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingSearchFilter;
 import com.fixinh.sbp.modules.booking.interfaces.external.BookingExternalService;
+import com.fixinh.sbp.modules.booking.model.Bill;
 import com.fixinh.sbp.modules.booking.model.BookingStatus;
 import com.fixinh.sbp.modules.booking.model.ServiceBooking;
 import com.fixinh.sbp.modules.booking.model.TechnicianRef;
 import com.fixinh.sbp.modules.booking.repository.ServiceBookingRepository;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
+import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
+import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -62,6 +67,8 @@ public class BookingServiceImpl implements BookingExternalService {
 	private final CustomerExternalService customerService;
 	private final ServiceBookingRepository bookingRepository;
 	private final ImageStorageService imageStorage;
+	/** Only for turning a stored provinceCode into the name §7.3 publishes (Req A.2.4). */
+	private final ReferenceExternalService referenceService;
 	@Override
 	public BookingSummaryDto createBooking(String customerId, BookingCreateCommand command) {
 		validator.validate(command);
@@ -212,6 +219,87 @@ public class BookingServiceImpl implements BookingExternalService {
 		}
 	}
 
+	/** §7.3, Reqs 3.3.S4–S6. */
+	@Override
+	public BookingDetailDto findBooking(String customerId, String bookingRef) {
+		ServiceBooking booking = bookingRepository.findByBookingRef(bookingRef)
+				.filter(candidate -> customerId.equals(candidate.getCustomerId()))
+				.orElseThrow(() -> new ApiException(ErrorCode.BOOKING_NOT_FOUND));
+
+		boolean scheduled = booking.getStatus() == BookingStatus.SCHEDULED;
+		List<TechnicianRef> technicians = booking.getTechnicians();
+
+		return new BookingDetailDto(
+				booking.getBookingRef(),
+				booking.getStatus(),
+				booking.getServiceId(),
+				booking.getServiceName(),
+				booking.getIssueDescription(),
+				booking.getPreferredServiceDate(),
+				booking.getAvailableStartTime(),
+				booking.getAvailableEndTime(),
+				booking.getCreatedAt(),
+				scheduled ? booking.getScheduledStartAt() : null,
+				scheduled ? booking.getEstimatedDurationMinutes() : null,
+				scheduled && technicians != null && !technicians.isEmpty() ? technicians : null,
+				toAddressDto(booking.getServiceAddress()),
+				toBillDto(booking.getBill()),
+				toCancellationDto(booking),
+				// No rating module yet, so false is accurate rather than a placeholder.
+				false,
+				booking.getCreatedAt());
+	}
+
+	/**
+	 * §7.3 publishes {@code provinceName}; the booking stores only the code, because a name
+	 * copied onto every record goes stale the day a province is renamed. Resolved through the
+	 * reference module's external interface rather than by reaching into its model — Req A.2.4
+	 * is that modules talk through interfaces, and the provinces list is small and cached.
+	 */
+	private BookingDetailDto.AddressDto toAddressDto(Address address) {
+		if (address == null) {
+			return null;
+		}
+		String provinceName = referenceService.listProvinces().stream()
+				.filter(province -> province.provinceCode().equals(address.getProvinceCode()))
+				.map(ProvinceDto::provinceName)
+				.findFirst()
+				// A code with no province behind it can only come from data written before the
+				// list changed. Showing the code beats showing nothing.
+				.orElse(address.getProvinceCode());
+
+		return new BookingDetailDto.AddressDto(
+				address.getStreetNumber(),
+				address.getStreetName(),
+				address.getWard(),
+				provinceName);
+	}
+
+	/** Absent until the technician issues it, which §7.3 says is ordinary and not an error. */
+	private BookingDetailDto.BillDto toBillDto(Bill bill) {
+		if (bill == null) {
+			return null;
+		}
+		return new BookingDetailDto.BillDto(
+				bill.serviceFee(),
+				bill.materialCost(),
+				// Req 3.3.S6's sum, computed by Bill so it cannot contradict its own parts.
+				bill.totalCost(),
+				bill.billImageUrl(),
+				bill.issuedAt());
+	}
+
+	/** Only on a booking that was actually cancelled — see BookingDetailDto.CancellationDto. */
+	private BookingDetailDto.CancellationDto toCancellationDto(ServiceBooking booking) {
+		if (booking.getCancelledAt() == null) {
+			return null;
+		}
+		return new BookingDetailDto.CancellationDto(
+				booking.getCancellationReason(),
+				booking.getEvidenceUrls() == null ? List.of() : booking.getEvidenceUrls(),
+				booking.getCancelledAt());
+	}
+
 	/**
 	 * @return true for {@code createdAt,asc}, false for the default {@code createdAt,desc}
 	 * @throws ApiException 400 INVALID_SORT_FIELD when the field named is anything but createdAt,
@@ -311,7 +399,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				scheduled ? booking.getScheduledStartAt() : null,
 				scheduled ? booking.getEstimatedDurationMinutes() : null,
 				scheduled && technicians != null && !technicians.isEmpty() ? technicians : null,
-				completed ? booking.getTotalCost() : null,
+				completed && booking.getBill() != null ? booking.getBill().totalCost() : null,
 				// No rating module yet — every booking genuinely has none, so false is accurate
 				// today, not a placeholder. Revisit once ratings exist to check for real.
 				false,

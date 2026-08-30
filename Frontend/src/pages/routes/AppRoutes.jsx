@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./ProtectedRoute";
 import { AdminRoute } from "./AdminRoute";
 import { MyBookingsPage } from "../booking/MyBookingsPage";
 import { NewBookingPage } from "../booking/NewBookingPage";
+import { BookingDetailPage } from "../booking/BookingDetailPage";
 import { AdminCustomersPage } from "../admin/AdminCustomersPage";
 import { AdminStaffPage } from "../admin/AdminStaffPage";
 import { AdminHomePage } from "../admin/AdminHomePage";
@@ -30,7 +31,10 @@ export function AppRoutes() {
           element={<ProfileCompletionPage />}
         />
         <Route path={ROUTES.BOOKING} element={<MyBookingsPage />} />
+        {/* Before the parameterised route below, so /booking/new is the new-booking form
+            rather than a detail page for a booking called "new". */}
         <Route path={ROUTES.NEW_BOOKING} element={<NewBookingPage />} />
+        <Route path={ROUTES.BOOKING_DETAIL} element={<BookingDetailPage />} />
       </Route>
 
       {/* Admins only. AdminRoute turns away a signed-in CUSTOMER as well as an
