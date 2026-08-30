@@ -7,8 +7,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.stereotype.Component;
 
+import com.fixinh.sbp.common.exception.ApiException;
+import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.smp.client.SmpBookingClient;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
 
 /**
@@ -21,9 +25,9 @@ import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
 public class MockSmpBookingClient implements SmpBookingClient {
 
 	/**
-	 * Mirrors the five categories the frontend already renders
-	 * (Frontend/src/pages/booking/mockBookings.js), so the mock catalogue and the mock UI agree
-	 * while SMT's real services and prices are still unknown. Placeholder fees — correct once
+	 * The five categories the booking screens draw icons for
+	 * (Frontend/src/components/booking/bookingPresentation.js), so a booking made against this
+	 * catalogue renders with an icon rather than the fallback. Placeholder fees — correct once
 	 * §12.5 is a real endpoint.
 	 */
 	private static final List<SmpRepairServiceDto> CATALOGUE = List.of(
@@ -38,8 +42,23 @@ public class MockSmpBookingClient implements SmpBookingClient {
 			new SmpRepairServiceDto("SVC-APPL-01", "Home Appliance Repair", "Home Appliance",
 					380_000, 90, true));
 
-	/** Unique only within one running process — real uniqueness comes from SMP once it exists. */
-	private final AtomicInteger sequence = new AtomicInteger(1000);
+	/** The four digits §2.6's ORD-YYYY-NNNN format allows, so the reference never gains a fifth. */
+	private static final int MIN_SEQUENCE = 1000;
+	private static final int MAX_SEQUENCE = 9999;
+
+	/**
+	 * Seeded from the clock rather than from a constant, <b>because the store outlives the
+	 * process</b>.
+	 *
+	 * <p>A fixed start of 1000 meant every restart began reissuing ORD-YYYY-1001 onward — and
+	 * those references were already in Mongo under a unique index on {@code bookingRef}, so the
+	 * first booking of the second run died on a duplicate key. A real SMP owns a durable
+	 * sequence; a mock has only the current time.
+	 *
+	 * <p>Two runs started inside the same minute still begin at the same number, which is why
+	 * the caller does not take a reference on trust — see {@code BookingServiceImpl}.
+	 */
+	private final AtomicInteger sequence = new AtomicInteger(seedFromClock());
 
 	@Override
 	public List<SmpRepairServiceDto> listRepairServices() {
@@ -48,7 +67,40 @@ public class MockSmpBookingClient implements SmpBookingClient {
 
 	@Override
 	public SmpBookingDto createBooking(String customerId, String serviceId) {
-		String bookingRef = "ORD-%d-%04d".formatted(Year.now().getValue(), sequence.incrementAndGet());
-		return new SmpBookingDto(bookingRef, "CREATED", Instant.now());
+		return new SmpBookingDto(nextReference(), "CREATED", Instant.now());
+	}
+
+	/** Wraps rather than overflowing: 9999 is followed by 1000, never by a five-digit 10000. */
+	private String nextReference() {
+		int next = sequence.updateAndGet(
+				current -> current >= MAX_SEQUENCE ? MIN_SEQUENCE : current + 1);
+		return "ORD-%d-%04d".formatted(Year.now().getValue(), next);
+	}
+
+	/** Minutes since the epoch, folded into the range the format allows. */
+	private static int seedFromClock() {
+		long minutes = Instant.now().getEpochSecond() / 60;
+		return (int) (minutes % (MAX_SEQUENCE - MIN_SEQUENCE)) + MIN_SEQUENCE;
+	}
+
+	/**
+	 * The three scenarios §13.2 requires of the cancellation mock — cancel from Scheduled,
+	 * terminate from Working, and a refusal from Completed — expressed as the rule §12.4 puts on
+	 * SMP's side rather than as fixture rows, because the rule is total: every one of Appendix
+	 * A's eight statuses has exactly one answer here.
+	 */
+	@Override
+	public SmpCancellationDto cancelBooking(
+			String bookingRef, String currentStatus, SmpCancellationRequest request) {
+
+		String resulting = switch (currentStatus) {
+			case "CREATED", "CONFIRMED", "SCHEDULED" -> "CANCELLED_BY_CUSTOMER";
+			case "WORKING" -> "TERMINATED_BY_CUSTOMER";
+			// COMPLETED, and anything already cancelled or aborted. §12.4 asks for a
+			// distinguishable 409 so SBP can say why rather than showing a generic failure.
+			default -> throw new ApiException(ErrorCode.BOOKING_NOT_CANCELLABLE);
+		};
+
+		return new SmpCancellationDto(bookingRef, resulting, request.cancelledAt());
 	}
 }

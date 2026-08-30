@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import com.fixinh.sbp.common.dto.PageResponse;
 import com.fixinh.sbp.common.exception.ApiException;
@@ -14,10 +15,16 @@ import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.smp.client.SmpBookingClient;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
+import com.fixinh.sbp.common.storage.ImageStorageService;
+import com.fixinh.sbp.common.storage.ImageUploadException;
+import com.fixinh.sbp.modules.booking.dto.external.BookingCancellationDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListItemDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListResponse;
 import com.fixinh.sbp.modules.booking.dto.external.BookingSummaryDto;
+import com.fixinh.sbp.modules.booking.dto.internal.BookingCancelCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingCreateCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingSearchFilter;
 import com.fixinh.sbp.modules.booking.interfaces.external.BookingExternalService;
@@ -28,19 +35,33 @@ import com.fixinh.sbp.modules.booking.repository.ServiceBookingRepository;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /** Booking creation (API Documentation §7.1, Reqs 3.3.S1–S3). */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BookingServiceImpl implements BookingExternalService {
 	/** API Doc §7.1: the window must be at least this many minutes wide. */
 	private static final int MINIMUM_WINDOW_MINUTES = 60;
 	private static final String CONFIRMATION_MESSAGE =
 			"Your booking has been created. A receptionist will confirm it shortly.";
+	/** §7.4: evidence images are grouped under this folder, giving cancel/ord-2026-1024-1.jpg. */
+	private static final String EVIDENCE_FOLDER = "cancel";
+
+	/**
+	 * How many references SMP may offer before the request is refused. Generous enough to walk
+	 * past a handful of stale numbers after a restart, small enough that a genuinely exhausted
+	 * sequence fails fast instead of hammering both stores.
+	 */
+	private static final int MAX_REFERENCE_ATTEMPTS = 10;
+
 	private final BookingCreateValidator validator;
+	private final BookingCancelValidator cancelValidator;
 	private final SmpBookingClient smpBookingClient;
 	private final CustomerExternalService customerService;
 	private final ServiceBookingRepository bookingRepository;
+	private final ImageStorageService imageStorage;
 	@Override
 	public BookingSummaryDto createBooking(String customerId, BookingCreateCommand command) {
 		validator.validate(command);
@@ -52,9 +73,9 @@ public class BookingServiceImpl implements BookingExternalService {
 				.orElseThrow(() -> new IllegalStateException(
 						"Authenticated customer " + customerId + " has no profile."));
 
-		// SMP owns the booking record and generates the reference; this call never fails today
-		// because the mock client always succeeds (§2.8, §13).
-		SmpBookingDto ack = smpBookingClient.createBooking(customerId, service.serviceId());
+		// SMP owns the booking record and generates the reference (§2.8, §13) — but a reference
+		// is not taken on trust, because a mock's sequence is not durable the way SMP's is.
+		SmpBookingDto ack = createWithUnusedReference(customerId, service.serviceId());
 		BookingStatus status = BookingStatus.valueOf(ack.status());
 		ServiceBooking booking = ServiceBooking.builder()
 				.bookingRef(ack.bookingRef())
@@ -71,7 +92,20 @@ public class BookingServiceImpl implements BookingExternalService {
 				.createdAt(ack.createdAt())
 				.homeRegion(homeRegion)
 				.build();
-		bookingRepository.save(booking);
+
+		try {
+			bookingRepository.save(booking);
+		}
+		catch (DuplicateKeyException ex) {
+			// The reference was free when it was checked and taken by the time it was written.
+			// Rare, and the unique index is what makes it rare rather than silent — but a lost
+			// race is not a fault, so it comes back as the retryable answer §7.1 already defines
+			// rather than as a 500 naming a traceId the customer cannot act on.
+			log.warn("Booking reference {} was taken between the check and the write.",
+					booking.getBookingRef(), ex);
+			throw new ApiException(ErrorCode.SMP_UNAVAILABLE);
+		}
+
 		return new BookingSummaryDto(
 				booking.getBookingRef(),
 				booking.getStatus(),
@@ -112,6 +146,72 @@ public class BookingServiceImpl implements BookingExternalService {
 		return new BookingListResponse(active, past,
 				PageResponse.Metadata.of(pageNumber, size, filtered.size()));
 	}
+	/**
+	 * §7.4, Req 3.3.M1. The order of the steps below is the contract, not a preference: §7.4
+	 * promises that a failed upload records no status change and that an unreachable SMP changes
+	 * nothing, so the local write is last and every way of failing happens before it.
+	 */
+	@Override
+	public BookingCancellationDto cancelBooking(
+			String customerId, String bookingRef, BookingCancelCommand command) {
+
+		// 1. Cheapest first, and before a single byte is uploaded.
+		cancelValidator.validate(command);
+
+		// 2. A booking belonging to someone else is reported as missing, not as forbidden (§7.3).
+		ServiceBooking booking = bookingRepository.findByBookingRef(bookingRef)
+				.filter(candidate -> customerId.equals(candidate.getCustomerId()))
+				.orElseThrow(() -> new ApiException(ErrorCode.BOOKING_NOT_FOUND));
+
+		// 3. Fail fast on a booking that has already finished. This is Appendix A's own
+		// active/past grouping, not a second copy of §12.4's rule — which of the two past
+		// statuses results is still SMP's decision at step 5.
+		if (!booking.getStatus().isActive()) {
+			throw new ApiException(ErrorCode.BOOKING_NOT_CANCELLABLE);
+		}
+
+		// 4. Images reach the store; only their URLs go any further (§7.4).
+		Instant cancelledAt = Instant.now();
+		List<String> evidenceUrls = storeEvidence(bookingRef, command);
+
+		// 5. SMP owns the record and therefore owns the resulting status. Today that is the mock
+		// applying §13.2's scenarios; the call site does not change when the real SMP arrives.
+		SmpCancellationDto ack = smpBookingClient.cancelBooking(
+				bookingRef,
+				booking.getStatus().name(),
+				SmpCancellationRequest.byCustomer(
+						command.reason().trim(), evidenceUrls, cancelledAt));
+
+		// 6. Only now is anything written locally.
+		booking.setStatus(BookingStatus.valueOf(ack.status()));
+		booking.setCancellationReason(command.reason().trim());
+		booking.setEvidenceUrls(evidenceUrls);
+		booking.setCancelledAt(ack.cancelledAt());
+		bookingRepository.save(booking);
+
+		return new BookingCancellationDto(
+				booking.getBookingRef(),
+				booking.getStatus(),
+				booking.getCancellationReason(),
+				booking.getEvidenceUrls(),
+				booking.getCancelledAt());
+	}
+
+	/**
+	 * @throws ApiException 502 UPLOAD_FAILED — the store refused, and because this runs before
+	 *         the booking is touched, "no status change was recorded" is true by construction
+	 *         rather than by unwinding one
+	 */
+	private List<String> storeEvidence(String bookingRef, BookingCancelCommand command) {
+		try {
+			return imageStorage.store(EVIDENCE_FOLDER, bookingRef,
+					cancelValidator.presentFiles(command.evidence()));
+		}
+		catch (ImageUploadException ex) {
+			throw new ApiException(ErrorCode.UPLOAD_FAILED);
+		}
+	}
+
 	/**
 	 * @return true for {@code createdAt,asc}, false for the default {@code createdAt,desc}
 	 * @throws ApiException 400 INVALID_SORT_FIELD when the field named is anything but createdAt,
@@ -218,6 +318,35 @@ public class BookingServiceImpl implements BookingExternalService {
 				// No sync pipeline updates a booking after creation yet (no §11.7 receiver), so
 				// createdAt is the last moment this projection is known to have been correct.
 				booking.getCreatedAt());
+	}
+
+	/**
+	 * Asks SMP for a booking until it comes back with a reference no store already holds.
+	 *
+	 * <p><b>Why this loop exists.</b> {@code bookingRef} is uniquely indexed on both shards, and
+	 * SBP's copy of a booking outlives the process that created it. A mock SMP numbers from a
+	 * counter it keeps in memory, so a restart hands out references a previous run already used —
+	 * and the save died on a duplicate key, which is a 500 for a customer who did nothing wrong.
+	 * {@code existsByBookingRef} was written for exactly this check; nothing had been calling it.
+	 *
+	 * <p>The check is not atomic with the save that follows, so the unique index remains the real
+	 * guarantee. It narrows the window from "every restart" to "two customers booking in the same
+	 * instant on a reference that also happens to be stale", and the {@link DuplicateKeyException}
+	 * catch below turns even that into a retryable answer rather than a fault.
+	 *
+	 * @throws ApiException 503 SMP_UNAVAILABLE once the attempts are spent — §7.1's own wording
+	 *         fits: nothing was created, nothing is half-written, and the customer may retry
+	 */
+	private SmpBookingDto createWithUnusedReference(String customerId, String serviceId) {
+		for (int attempt = 1; attempt <= MAX_REFERENCE_ATTEMPTS; attempt++) {
+			SmpBookingDto ack = smpBookingClient.createBooking(customerId, serviceId);
+			if (!bookingRepository.existsByBookingRef(ack.bookingRef())) {
+				return ack;
+			}
+			log.warn("SMP returned booking reference {}, which is already in use. Attempt {} of {}.",
+					ack.bookingRef(), attempt, MAX_REFERENCE_ATTEMPTS);
+		}
+		throw new ApiException(ErrorCode.SMP_UNAVAILABLE);
 	}
 
 	/** Req: "validate service exists". Inactive counts as not found (§5.2's activeOnly note). */

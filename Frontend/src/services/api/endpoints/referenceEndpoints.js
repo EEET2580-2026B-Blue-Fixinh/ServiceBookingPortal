@@ -26,7 +26,10 @@ export async function fetchProvinces() {
  *                          baseServiceFee: number, standardDurationMinutes: number,
  *                          isActive: boolean}>>}
  */
-export async function fetchRepairServices() {
-  const response = await apiClient.get(API_ENDPOINTS.REFERENCE.REPAIR_SERVICES)
+export async function fetchRepairServices({ activeOnly = true } = {}) {
+  const path = activeOnly
+    ? API_ENDPOINTS.REFERENCE.REPAIR_SERVICES
+    : `${API_ENDPOINTS.REFERENCE.REPAIR_SERVICES}?activeOnly=false`
+  const response = await apiClient.get(path)
   return response.items
 }

@@ -3,6 +3,8 @@ package com.fixinh.sbp.common.smp.client;
 import java.util.List;
 
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
+import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
 
 /**
@@ -26,4 +28,22 @@ public interface SmpBookingClient {
 	 * unavailable").
 	 */
 	SmpBookingDto createBooking(String customerId, String serviceId);
+
+	/**
+	 * Records a cancellation the customer made in SBP (§12.4, Req 3.3.M1).
+	 *
+	 * <p><b>The resulting status is SMP's answer, not SBP's.</b> §12.4 puts the rule — cancelled
+	 * from Created, Confirmed or Scheduled; terminated from Working — on the side that owns the
+	 * record, so this call returns the new status rather than accepting one.
+	 *
+	 * @param currentStatus what SBP's projection believes the booking is. The real SMP will look
+	 *        this up for itself and ignore what it is told; the mock has no store of its own, so
+	 *        this is how it learns where the booking stood. Either way the <i>rule</i> stays
+	 *        behind this interface and never leaks into the booking service.
+	 * @throws com.fixinh.sbp.common.exception.ApiException 409 {@code BOOKING_NOT_CANCELLABLE}
+	 *         when the booking has already finished, been cancelled or been aborted — §12.4 asks
+	 *         for "a 409 with a distinguishable code ... so SBP can explain why"
+	 */
+	SmpCancellationDto cancelBooking(
+			String bookingRef, String currentStatus, SmpCancellationRequest request);
 }

@@ -1,7 +1,9 @@
 package com.fixinh.sbp.modules.booking.interfaces.external;
 
+import com.fixinh.sbp.modules.booking.dto.external.BookingCancellationDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListResponse;
 import com.fixinh.sbp.modules.booking.dto.external.BookingSummaryDto;
+import com.fixinh.sbp.modules.booking.dto.internal.BookingCancelCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingCreateCommand;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingSearchFilter;
 
@@ -26,4 +28,22 @@ public interface BookingExternalService {
 	 *         INVALID_DATE_RANGE
 	 */
 	BookingListResponse listBookings(String customerId, BookingSearchFilter filter);
+
+	/**
+	 * Cancels or terminates one of the customer's own bookings, with a written reason and up to
+	 * three evidence images (API Documentation §7.4, Req 3.3.M1).
+	 *
+	 * <p>The resulting status is not an argument and not a return of this module's reasoning:
+	 * SMP owns the booking record and applies the rule, and this call echoes its answer.
+	 *
+	 * @param customerId the owner, read from the token. A booking belonging to anyone else is
+	 *        reported as 404, not 403 — §7.3 makes "not yours" and "does not exist" the same
+	 *        answer so references cannot be probed
+	 * @throws com.fixinh.sbp.common.exception.ApiException 400 VALIDATION_FAILED /
+	 *         TOO_MANY_IMAGES, 404 BOOKING_NOT_FOUND, 409 BOOKING_NOT_CANCELLABLE,
+	 *         413 FILE_TOO_LARGE, 415 UNSUPPORTED_FILE_TYPE, 502 UPLOAD_FAILED or
+	 *         503 SMP_UNAVAILABLE
+	 */
+	BookingCancellationDto cancelBooking(
+			String customerId, String bookingRef, BookingCancelCommand command);
 }

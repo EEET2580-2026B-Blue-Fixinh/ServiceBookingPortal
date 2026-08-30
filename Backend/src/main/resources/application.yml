@@ -8,6 +8,18 @@ spring:
       # Disable auto-index creation when using MongoDB Atlas with existing indexes
       auto-index-creation: false
 
+  servlet:
+    multipart:
+      # Req 3.3.M1, 3.4.M1: up to three evidence images of 5 MB each (API Doc §7.4, §8.1).
+      # max-file-size is a backstop, not the rule -- BookingCancelValidator rejects an
+      # oversized image with 413 FILE_TOO_LARGE and its own message, which this cannot do.
+      # max-request-size allows the three files plus the text parts around them.
+      # Above 5 MB on purpose: the validator must be the one that answers, so an oversized
+      # image gets 413 with a message naming the real limit instead of a container-level
+      # rejection. GlobalExceptionHandler still maps a breach of this cap to 413.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:8MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:26MB}
+
 server:
   port: ${SERVER_PORT:8443}
   ssl:
@@ -97,9 +109,26 @@ fixinh:
         base-delay: ${EMAIL_RETRY_BASE_DELAY:PT2M}
         batch-size: ${EMAIL_RETRY_BATCH_SIZE:50}
 
+    images:
+      # Req 3.3.M1, 3.4.M1, API Doc §7.4: evidence images on a cancellation or a rating.
+      #
+      # Same split as email above: this block is policy, the account credential is below.
+      #
+      # mode: local      -> ImageStorageService writes under local-directory and nothing
+      #                     leaves the machine. The default, so publishing customer
+      #                     photographs is opted into rather than fallen into, and so the
+      #                     cancellation flow works with no Cloudinary account at all.
+      #       cloudinary -> uploaded to the account below; the returned URLs are public.
+      #
+      # Point local-directory somewhere unwritable to exercise §7.4's 502 UPLOAD_FAILED.
+      mode: ${IMAGE_STORAGE_MODE:local}
+      # Under target/ for the same reason the mail outbox is: .gitignore covers it and
+      # mvn clean discards the images instead of leaving them in the working tree.
+      local-directory: ${IMAGE_LOCAL_DIR:target/uploads}
+
     cloudinary:
-      # Req 3.3.M1, 3.4.M1: images are relayed through the backend, never
-      # uploaded directly from the browser to Cloudinary.
+      # Read only when images.mode is cloudinary. Images are relayed through the backend,
+      # never uploaded directly from the browser, so the secret stays on this side.
       cloud-name: ${CLOUDINARY_CLOUD_NAME:}
       api-key: ${CLOUDINARY_API_KEY:}
       api-secret: ${CLOUDINARY_API_SECRET:}

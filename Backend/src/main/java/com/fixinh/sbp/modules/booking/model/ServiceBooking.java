@@ -88,6 +88,22 @@ public class ServiceBooking {
 	 * {@code serviceFee + materialCost}, computed on SMP's side, not recomputed here.
 	 */
 	private Long totalCost;
+	/**
+	 * Why the customer cancelled, in their own words (Req 3.3.M1, §7.4). 10 to 500 characters.
+	 * Null on a booking nobody has cancelled, which is most of them.
+	 */
+	private String cancellationReason;
+
+	/**
+	 * Links to the evidence images attached to the cancellation — <b>never the bytes</b>. §7.4 is
+	 * explicit that images reach Cloudinary through the backend and that only URLs are stored,
+	 * so nothing here ever grows with the size of a photograph.
+	 */
+	private List<String> evidenceUrls;
+
+	/** When the customer cancelled. Set together with the resulting past status, or not at all. */
+	private Instant cancelledAt;
+
 	/** Which shard holds the authoritative copy — the customer's home region, not the job's. */
 	private Region homeRegion;
 }
