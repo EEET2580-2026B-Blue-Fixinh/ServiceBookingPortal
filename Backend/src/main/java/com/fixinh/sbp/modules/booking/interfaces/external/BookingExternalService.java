@@ -1,6 +1,7 @@
 package com.fixinh.sbp.modules.booking.interfaces.external;
 
 import com.fixinh.sbp.modules.booking.dto.external.BookingCancellationDto;
+import com.fixinh.sbp.modules.booking.dto.external.BookingDetailDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListResponse;
 import com.fixinh.sbp.modules.booking.dto.external.BookingSummaryDto;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingCancelCommand;
@@ -46,4 +47,16 @@ public interface BookingExternalService {
 	 */
 	BookingCancellationDto cancelBooking(
 			String customerId, String bookingRef, BookingCancelCommand command);
+
+	/**
+	 * One of the customer's own bookings in full (API Documentation §7.3, Reqs 3.3.S4, 3.3.S5,
+	 * 3.3.S6) — the issue they described, the window they offered, the schedule once there is
+	 * one, and the bill once the technician has issued it.
+	 *
+	 * @param customerId the owner, read from the token
+	 * @throws com.fixinh.sbp.common.exception.ApiException 404 BOOKING_NOT_FOUND when the
+	 *         reference is unknown <b>or belongs to someone else</b>. §7.3 makes those the same
+	 *         answer deliberately, so references cannot be probed for existence
+	 */
+	BookingDetailDto findBooking(String customerId, String bookingRef);
 }

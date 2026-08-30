@@ -84,10 +84,14 @@ public class ServiceBooking {
 	/** Who is assigned, once assigned. Null (not empty) until then, same reasoning. */
 	private List<TechnicianRef> technicians;
 	/**
-	 * The billed total once the booking is COMPLETED (Req 3.3.S6). Null until SMP marks it so —
-	 * {@code serviceFee + materialCost}, computed on SMP's side, not recomputed here.
+	 * What the job cost, once the technician has issued the bill (Req 3.3.S6). Null until then,
+	 * which §7.3 is explicit is an ordinary state and not an error.
+	 *
+	 * <p>One object rather than a loose {@code totalCost} beside a loose fee and material cost:
+	 * the total is derived from the other two inside {@link Bill}, so there is no second copy of
+	 * it here to fall out of step.
 	 */
-	private Long totalCost;
+	private Bill bill;
 	/**
 	 * Why the customer cancelled, in their own words (Req 3.3.M1, §7.4). 10 to 500 characters.
 	 * Null on a booking nobody has cancelled, which is most of them.

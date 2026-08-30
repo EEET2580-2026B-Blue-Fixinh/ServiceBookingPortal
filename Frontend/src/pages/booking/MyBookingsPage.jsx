@@ -9,13 +9,25 @@ import {
   formatMoney,
   iconResolver,
 } from "../../components/booking/bookingPresentation";
+import { CancelBookingDialog } from "../../components/booking/CancelBookingDialog";
 import { MaterialIcon } from "../../components/shared/icons";
 import { SelectField } from "../../components/shared/form/SelectField/SelectField";
 import { Toast } from "../../components/shared/Toast";
+import { ROUTES } from "../../config/constants";
 import { useMyBookings } from "../../hooks/useMyBookings";
+import { cancelBooking } from "../../services/api/endpoints/bookingEndpoints";
 import { fetchRepairServices } from "../../services/api/endpoints/referenceEndpoints";
 
 const ALL_SERVICES = "All services";
+
+// Section 7.2 accepts ACTIVE or PAST and nothing finer. The issue asked for tabs "by
+// status", but the API groups rather than filters by each of Appendix A's eight values —
+// and grouping is what Req 3.3.M2 actually asks the screen to show.
+const GROUP_TABS = [
+  { label: "All", value: undefined },
+  { label: "Active", value: "ACTIVE" },
+  { label: "Past", value: "PAST" },
+];
 
 // Section 7.2 accepts exactly these two. The label is what the customer picks; the value
 // is what goes on the wire, so no part of the UI has to know the sort syntax.
@@ -39,12 +51,25 @@ const DATE_INPUT_CLASS =
   "rounded-[9px] border border-bk-border bg-white px-3 py-2.5 font-[inherit] text-bk-text " +
   "focus:border-bk-teal focus:outline-none focus:ring-[3px] focus:ring-bk-teal-soft";
 
-function BookingCard({ booking, iconFor }) {
+function BookingCard({ booking, iconFor, onCancel, onOpen }) {
   const schedule = buildSchedule(booking);
   const total = formatMoney(booking.totalCost);
 
   return (
-    <article className="flex items-center gap-4 rounded-xl border border-bk-border bg-bk-surface px-[18px] py-4 max-[700px]:flex-wrap">
+    // The row opens the booking; the Cancel button inside it does not. Anything interactive
+    // nested here stops the click before it reaches this handler.
+    <article
+      role="link"
+      tabIndex={0}
+      onClick={() => onOpen(booking)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(booking);
+        }
+      }}
+      className="flex cursor-pointer items-center gap-4 rounded-xl border border-bk-border bg-bk-surface px-[18px] py-4 hover:border-bk-teal focus:border-bk-teal focus:outline-none focus:ring-[3px] focus:ring-bk-teal-soft max-[700px]:flex-wrap"
+    >
       <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] bg-bk-bg text-bk-text">
         <MaterialIcon
           name={iconFor(booking.serviceId)}
@@ -102,13 +127,37 @@ function BookingCard({ booking, iconFor }) {
             title="You have rated this booking"
           />
         )}
+        {/* Only active bookings get the control, and "active" is the array the server put
+            this row in — not a status list re-derived here. Section 7.4 refuses anything
+            past with 409, so a second opinion could only ever disagree with the first. */}
+        {onCancel && (
+          <button
+            type="button"
+            onClick={(event) => {
+              // Without this the row's own handler fires too and the customer lands on the
+              // detail page with a dialog they did not ask for.
+              event.stopPropagation();
+              onCancel(booking);
+            }}
+            className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-3 py-1.5 text-[13px] font-bold text-bk-red hover:border-bk-red hover:bg-bk-red-soft"
+          >
+            Cancel
+          </button>
+        )}
         <MaterialIcon name="chevron_right" className="text-xl text-bk-muted" />
       </span>
     </article>
   );
 }
 
-function BookingSection({ title, dotClassName, bookings, iconFor }) {
+function BookingSection({
+  title,
+  dotClassName,
+  bookings,
+  iconFor,
+  onCancel,
+  onOpen,
+}) {
   if (bookings.length === 0) return null;
 
   return (
@@ -124,6 +173,8 @@ function BookingSection({ title, dotClassName, bookings, iconFor }) {
             key={booking.bookingRef}
             booking={booking}
             iconFor={iconFor}
+            onCancel={onCancel}
+            onOpen={onOpen}
           />
         ))}
       </div>
@@ -138,11 +189,20 @@ export function MyBookingsPage() {
 
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [group, setGroup] = useState(undefined);
   const [page, setPage] = useState(0);
   const [services, setServices] = useState([]);
   const [showWelcome, setShowWelcome] = useState(
     Boolean(location.state?.justSignedIn),
   );
+
+  // The booking the dialog is open for, and how that request is going. Held here rather
+  // than inside the dialog because the page is what submits, what refreshes the list
+  // afterwards, and what has to survive the dialog closing.
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [cancelError, setCancelError] = useState(null);
+  const [cancelledMessage, setCancelledMessage] = useState(null);
 
   const setFilter = (key) => (value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -191,6 +251,7 @@ export function MyBookingsPage() {
       serviceIds: serviceIdsByName.get(filters.serviceName),
       createdFrom: filters.createdFrom,
       createdTo: filters.createdTo,
+      group,
       sort: SORT_OPTIONS.find((option) => option.label === filters.sort)?.value,
       page,
     }),
@@ -201,12 +262,50 @@ export function MyBookingsPage() {
       filters.createdFrom,
       filters.createdTo,
       filters.sort,
+      group,
       page,
     ],
   );
 
   const { active, past, page: pageInfo, status, error, reload } =
     useMyBookings(query);
+
+  const openBooking = (booking) =>
+    navigate(ROUTES.bookingDetail(booking.bookingRef));
+
+  const openCancelDialog = (booking) => {
+    setCancelTarget(booking);
+    setCancelError(null);
+  };
+
+  const submitCancellation = async ({ reason, evidence }) => {
+    setCancelPending(true);
+    setCancelError(null);
+    try {
+      // The response names the status the server chose — CANCELLED_BY_CUSTOMER or
+      // TERMINATED_BY_CUSTOMER — so the message tells the customer what actually
+      // happened instead of assuming which one it was.
+      const result = await cancelBooking(cancelTarget.bookingRef, {
+        reason,
+        evidence,
+      });
+      setCancelTarget(null);
+      setCancelledMessage(
+        `${result.bookingRef} is now ${
+          result.status === "TERMINATED_BY_CUSTOMER" ? "terminated" : "cancelled"
+        }.`,
+      );
+      // Refetched rather than patched in place: the booking has to move from the active
+      // array to the past one, and the server is what decides which array it belongs in.
+      reload();
+    } catch (requestError) {
+      // The dialog stays open holding what was typed, so a rejected reason can be fixed
+      // rather than retyped.
+      setCancelError(requestError);
+    } finally {
+      setCancelPending(false);
+    }
+  };
 
   const iconFor = useMemo(() => iconResolver(services), [services]);
 
@@ -244,6 +343,21 @@ export function MyBookingsPage() {
           onDismiss={() => setShowWelcome(false)}
         />
       )}
+      {cancelledMessage && (
+        <Toast
+          message={cancelledMessage}
+          onDismiss={() => setCancelledMessage(null)}
+        />
+      )}
+      {cancelTarget && (
+        <CancelBookingDialog
+          booking={cancelTarget}
+          pending={cancelPending}
+          error={cancelError}
+          onConfirm={submitCancellation}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
       {location.state?.googleAccountLinked && (
         <p
           className="mb-4 rounded-lg bg-bk-teal-soft px-4 py-3 text-sm font-semibold text-bk-teal-strong"
@@ -252,6 +366,35 @@ export function MyBookingsPage() {
           Your Google account is now linked to your Fixinh account.
         </p>
       )}
+
+      <div
+        className="mb-3.5 flex gap-1.5 rounded-[10px] border border-bk-border bg-bk-surface p-1.5"
+        role="tablist"
+        aria-label="Filter bookings by group"
+      >
+        {GROUP_TABS.map((tab) => {
+          const selected = group === tab.value;
+          return (
+            <button
+              key={tab.label}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => {
+                setGroup(tab.value);
+                setPage(0);
+              }}
+              className={`appearance-none rounded-[7px] px-4 py-1.5 text-[13.5px] font-bold ${
+                selected
+                  ? "bg-bk-teal text-white"
+                  : "bg-transparent text-bk-muted hover:bg-bk-bg hover:text-bk-text"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="mb-[18px] grid grid-cols-[minmax(220px,1.6fr)_repeat(4,minmax(140px,1fr))] gap-3.5 rounded-xl border border-bk-border bg-bk-surface p-[18px] max-[1100px]:grid-cols-2 max-[700px]:grid-cols-1">
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -371,12 +514,15 @@ export function MyBookingsPage() {
                 dotClassName="bg-bk-teal"
                 bookings={active}
                 iconFor={iconFor}
+                onCancel={openCancelDialog}
+                onOpen={openBooking}
               />
               <BookingSection
                 title="Past bookings"
                 dotClassName="bg-bk-muted"
                 bookings={past}
                 iconFor={iconFor}
+                onOpen={openBooking}
               />
 
               {totalPages > 1 && (

@@ -46,6 +46,11 @@ export const API_ENDPOINTS = {
     // Same path, different method (Section 7.2). The rule this file states is that the
     // whole URL is readable on one line, not that two lines may never share one.
     LIST: "/bookings",
+    // Functions because the reference sits inside the path. Section 2.6 calls identifiers
+    // opaque, so the segment is encoded rather than trusted to be URL-safe.
+    DETAIL: (bookingRef) => `/bookings/${encodeURIComponent(bookingRef)}`,
+    CANCEL: (bookingRef) =>
+      `/bookings/${encodeURIComponent(bookingRef)}/cancellation`,
   },
   // The signed-in caller's own notifications (API Documentation Section 9). Every
   // one of these acts on whoever the token names; none of them takes a recipient.

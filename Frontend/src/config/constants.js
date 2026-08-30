@@ -24,6 +24,9 @@ export const ROUTES = {
   REGISTER: "/register",
   BOOKING: "/booking",
   NEW_BOOKING: "/booking/new",
+  // Declared after NEW_BOOKING so the literal path is not shadowed by the parameter.
+  BOOKING_DETAIL: "/booking/:bookingRef",
+  bookingDetail: (bookingRef) => `/booking/${encodeURIComponent(bookingRef)}`,
   ADMIN: "/admin",
   PROFILE_COMPLETION: "/profile/complete", // Address-based shard placement (Req 3.1.U1-U2)
 };

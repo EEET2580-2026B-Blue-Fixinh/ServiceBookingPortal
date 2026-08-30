@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.fixinh.sbp.common.security.jwt.UserPrincipal;
 import com.fixinh.sbp.modules.booking.dto.external.BookingCancellationDto;
+import com.fixinh.sbp.modules.booking.dto.external.BookingDetailDto;
 import com.fixinh.sbp.modules.booking.dto.external.BookingListResponse;
 import com.fixinh.sbp.modules.booking.dto.external.BookingSummaryDto;
 import com.fixinh.sbp.modules.booking.dto.internal.BookingCancelCommand;
@@ -68,6 +69,22 @@ public class BookingController {
 		BookingSearchFilter filter = new BookingSearchFilter(
 				q, serviceId, createdFrom, createdTo, group, sort, page, size);
 		return bookingService.listBookings(principal.id(), filter);
+	}
+
+	/**
+	 * Section 7.3. One booking in full — the schedule when it has one, and the bill when the
+	 * technician has issued it (Reqs 3.3.S4, 3.3.S5, 3.3.S6).
+	 *
+	 * <p>Mapped below the collection on purpose: {@code /bookings} and
+	 * {@code /bookings/{bookingRef}} are the same resource at two levels of detail, and Spring
+	 * matches the literal path before the templated one either way.
+	 */
+	@GetMapping("/{bookingRef}")
+	public BookingDetailDto findBooking(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable String bookingRef) {
+
+		return bookingService.findBooking(principal.id(), bookingRef);
 	}
 
 	/**
