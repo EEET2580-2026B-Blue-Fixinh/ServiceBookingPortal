@@ -6,6 +6,13 @@
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8443/api/v1";
 
+// The real-time channel (API Documentation Section 9.3): /ws at the root, not
+// under /api/v1 — it is a transport endpoint, not a resource. http rather than
+// ws on purpose: SockJS negotiates the transport itself, starting with an HTTP
+// request to /ws/info, so it takes the same scheme the REST calls use. Override
+// via VITE_WS_URL alongside VITE_API_URL once the dev profile serves https.
+export const WS_URL = import.meta.env.VITE_WS_URL ?? "http://localhost:8443/ws";
+
 // Google OAuth 2.0 configuration (Req 3.2.U1). Client ID comes from Google
 // Cloud Console; redirect URI is where Google sends the user after consent.
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
