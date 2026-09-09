@@ -22,6 +22,10 @@
   --color-bk-red: #b91c1c;
   --color-bk-red-soft: rgba(220, 38, 38, 0.08);
   --animate-fx-in: fx-in 0.18s ease both;
+  /* The toast entrance from the design mockup: rises a little further than fx-in
+     and settles with a slight overshoot, so a card arriving at the bottom-right
+     corner reads as "placed" rather than "faded in". */
+  --animate-fx-toast: fx-toast 0.28s cubic-bezier(0.2, 0.9, 0.3, 1) both;
   --font-mono: var(--mono);
 }
 
@@ -36,8 +40,20 @@
   }
 }
 
+@keyframes fx-toast {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fx-in {
+  .animate-fx-in,
+  .animate-fx-toast {
     animation: none;
   }
 }

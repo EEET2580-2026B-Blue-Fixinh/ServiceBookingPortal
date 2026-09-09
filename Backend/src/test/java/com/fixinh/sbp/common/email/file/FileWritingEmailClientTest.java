@@ -84,7 +84,7 @@ class FileWritingEmailClientTest {
 
 		// A file sitting where the outbox directory should be. createDirectories then fails,
 		// which is the cheapest cross-platform way to simulate a provider outage -- and the
-		// hook the 502 EMAIL_DELIVERY_FAILED test in patch 7 will use.
+		// hook the 502 EMAIL_DELIVERY_FAILED test uses.
 		Path blocked = tempDir.resolve("mail");
 		Files.createFile(blocked);
 

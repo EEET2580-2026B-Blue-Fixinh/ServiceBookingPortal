@@ -41,6 +41,13 @@ public enum ErrorCode {
 			"This refresh token is unknown or has already been used."),
 	AUTH_REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED,
 			"Your session has expired. Please sign in again."),
+	/**
+	 * Appendix B: authenticated, but the role or ownership check failed. Raised on the STOMP
+	 * channel (§9.3) for a SUBSCRIBE to any destination other than the caller's own queue,
+	 * and for any SEND — the channel is outbound-only.
+	 */
+	ACCESS_DENIED(HttpStatus.FORBIDDEN,
+			"You do not have permission to perform this action."),
 	OAUTH_CODE_INVALID(HttpStatus.BAD_REQUEST,
 			"The OAuth authorization code is invalid or has expired."),
 	OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.BAD_GATEWAY,

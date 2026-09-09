@@ -6,17 +6,25 @@ import { ROUTES } from '../../../config/constants'
  * object in a different surface, and the mockup draws it as `task_alt`. Matching
  * the mockup here was the deliberate choice — flagged rather than silently
  * reconciled, because the two files now disagree on purpose.
+ *
+ * `tone` is for the toast a pushed notification raises, and is also the mockup's:
+ * a confirmation is good news (`ok`), a schedule is the primary event (`pri`).
+ * The toast's icon comes from the tone — `ok` draws `check_circle` — which is
+ * why the panel's `task_alt` for the same type is not a contradiction: the mockup
+ * gives the two surfaces different icons on purpose.
  */
 const PRESENTATION_BY_TYPE = {
   BOOKING_CONFIRMED: {
     title: 'Booking confirmed',
     icon: 'task_alt',
     iconClass: 'text-bk-blue',
+    tone: 'ok',
   },
   BOOKING_SCHEDULED: {
     title: 'Technician scheduled',
     icon: 'event_available',
     iconClass: 'text-bk-teal',
+    tone: 'pri',
   },
   // Addressed to STAFF, who have no SBP session, so this should never reach a
   // bell.
@@ -24,6 +32,7 @@ const PRESENTATION_BY_TYPE = {
     title: 'Staff account created',
     icon: 'badge',
     iconClass: 'text-bk-muted',
+    tone: 'neutral',
   },
 }
 
@@ -38,10 +47,21 @@ const UNKNOWN_TYPE = {
   title: 'Notification',
   icon: 'notifications',
   iconClass: 'text-bk-muted',
+  tone: 'neutral',
 }
 
 export function presentationFor(type) {
   return PRESENTATION_BY_TYPE[type] ?? UNKNOWN_TYPE
+}
+
+/**
+ * The toast a notification raises when it arrives live over the real-time
+ * channel (Section 9.3): the type's title and tone, and the message as the body.
+ * Same table as the panel, so the two can never call one type by two names.
+ */
+export function toastFor(notification) {
+  const { title, tone } = presentationFor(notification.type)
+  return { tone, title, body: notification.message }
 }
 
 // The API sends ISO-8601 UTC and the frontend displays
@@ -101,10 +121,11 @@ export function formatNotificationTime(createdAt, now) {
  * on a notification that concerns no booking (`@JsonInclude(NON_NULL)` on the
  * DTO), and STAFF_ACCOUNT_CREATED never has one. The item renders both shapes.
  *
- * <p><b>Step 14 is a one-line change to this function.</b> `/booking/:bookingRef`
- * does not exist yet, so a notification that does concern a booking lands on the
- * bookings list instead of the booking. When that route is added, this returns
- * `ROUTES.BOOKING_DETAIL(bookingRef)` and nothing else in the panel moves.
+ * <p><b>Landing on the booking itself is a one-line change to this function.</b>
+ * `/booking/:bookingRef` is served now (ROUTES.BOOKING_DETAIL), but the panel still
+ * sends the reader to the bookings list, as it did before the detail page existed.
+ * Returning the detail path here would change that, and nothing else in the panel
+ * would move; it is left to whoever owns the panel's navigation behaviour.
  */
 export function routeFor(notification) {
   return notification.bookingRef ? ROUTES.BOOKING : null

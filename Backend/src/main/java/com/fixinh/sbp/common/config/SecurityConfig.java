@@ -57,6 +57,13 @@ public class SecurityConfig {
 						// cannot require the token registration has not issued yet (Req 3.1.S4).
 						.requestMatchers("/api/v1/reference/provinces").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info").permitAll()
+						// The WebSocket handshake is unauthenticated by design (API Doc §9.3):
+						// SockJS cannot put a bearer token on it. The token travels in the STOMP
+						// CONNECT frame instead and is checked there by
+						// StompAuthChannelInterceptor, so nothing reaches a customer's queue
+						// without the same JWT the REST API demands. /ws/** covers SockJS's
+						// /ws/info and per-session transport URLs.
+						.requestMatchers("/ws", "/ws/**").permitAll()
 						// Req A.2.a: staff/customer must not reach admin resources.
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 						// /bookings/* is CUSTOMER-only (API Doc §2.4 authorization matrix); an
