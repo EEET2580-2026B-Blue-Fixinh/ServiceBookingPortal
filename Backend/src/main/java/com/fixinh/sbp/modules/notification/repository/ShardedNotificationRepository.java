@@ -72,8 +72,9 @@ public class ShardedNotificationRepository implements NotificationRepository {
 
 	@Override
 	public List<Notification> findOutstandingEmails(int limit) {
-		// Field order matches the {deliveryStatus, lastAttemptAt} index from patch 3, so this
-		// reads an index range rather than scanning every notification ever sent.
+		// Field order matches the {deliveryStatus, lastAttemptAt} index that
+		// ShardIndexInitializer creates, so this reads an index range rather than scanning
+		// every notification ever sent.
 		Query query = Query.query(
 						Criteria.where("deliveryStatus")
 								.in(DeliveryStatus.PENDING, DeliveryStatus.FAILED)

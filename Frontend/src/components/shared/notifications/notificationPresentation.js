@@ -121,10 +121,11 @@ export function formatNotificationTime(createdAt, now) {
  * on a notification that concerns no booking (`@JsonInclude(NON_NULL)` on the
  * DTO), and STAFF_ACCOUNT_CREATED never has one. The item renders both shapes.
  *
- * <p><b>Step 14 is a one-line change to this function.</b> `/booking/:bookingRef`
- * does not exist yet, so a notification that does concern a booking lands on the
- * bookings list instead of the booking. When that route is added, this returns
- * `ROUTES.BOOKING_DETAIL(bookingRef)` and nothing else in the panel moves.
+ * <p><b>Landing on the booking itself is a one-line change to this function.</b>
+ * `/booking/:bookingRef` is served now (ROUTES.BOOKING_DETAIL), but the panel still
+ * sends the reader to the bookings list, as it did before the detail page existed.
+ * Returning the detail path here would change that, and nothing else in the panel
+ * would move; it is left to whoever owns the panel's navigation behaviour.
  */
 export function routeFor(notification) {
   return notification.bookingRef ? ROUTES.BOOKING : null

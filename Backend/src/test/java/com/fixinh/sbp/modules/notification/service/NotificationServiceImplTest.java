@@ -373,7 +373,8 @@ class NotificationServiceImplTest {
 		assertEquals(CUSTOMER_ID, written.getRecipientIdentifier());
 		assertEquals("ORD-2026-1024", written.getBookingRef());
 		assertFalse(written.isReadStatus(), "a new notification has not been read");
-		assertNotNull(raised.notificationId(), "5.1 pushes this without reading anything back");
+		assertNotNull(raised.notificationId(),
+				"the real-time push sends this without reading anything back");
 	}
 
 	@Test
