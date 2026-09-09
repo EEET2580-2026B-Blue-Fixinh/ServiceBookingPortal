@@ -1,3 +1,4 @@
+import { Pagination } from '../../../shared/Pagination'
 import { StaffCard } from './StaffCard'
 
 function StatCard({ label, value }) {
@@ -13,11 +14,15 @@ function StatCard({ label, value }) {
 export function StaffList({
   staff,
   total,
+  matchCount,
   loading,
   technicianCount,
   receptionistCount,
   loadingStaffId,
   onEdit,
+  page,
+  pageSize,
+  onPageChange,
 }) {
   return (
     <>
@@ -59,10 +64,18 @@ export function StaffList({
             </tbody>
           </table>
 
-          {staff.length === 0 && (
+          {matchCount === 0 ? (
             <p className="px-[18px] py-10 text-center text-bk-muted">
               {total === 0 ? 'No staff accounts yet.' : 'No staff match your search.'}
             </p>
+          ) : (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={matchCount}
+              itemNoun="staff accounts"
+              onPageChange={onPageChange}
+            />
           )}
         </div>
       )}

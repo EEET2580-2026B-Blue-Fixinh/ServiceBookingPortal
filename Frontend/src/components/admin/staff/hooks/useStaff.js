@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { fetchStaff } from '../services/adminStaffEndpoints'
 
 const SEARCH_DEBOUNCE_MS = 300
+const PAGE_SIZE = 5
 
 /**
  * Loads the staff/technician list and delegates search to the backend/mocked
@@ -20,6 +21,7 @@ export function useStaff() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   // Discards a search response that resolves after a newer one was already
   // requested, so fast typing can't let a stale result overwrite a fresh one.
@@ -56,16 +58,35 @@ export function useStaff() {
 
   const technicianCount = allStaff.filter((m) => m.staffRole === 'TECHNICIAN').length
 
+  // The list the table is paging through: the search response when searching,
+  // otherwise the full roster.
+  const visibleStaff = search.trim() ? (searchResults ?? allStaff) : allStaff
+
+  const pageCount = Math.max(1, Math.ceil(visibleStaff.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const pageStaff = visibleStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // A new search makes the current page number meaningless, so it sends the
+  // reader back to the first page.
+  const changeSearch = (value) => {
+    setSearch(value)
+    setPage(1)
+  }
+
   return {
-    staff: search.trim() ? (searchResults ?? allStaff) : allStaff,
+    staff: pageStaff,
+    matchCount: visibleStaff.length,
     total: allStaff.length,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    setPage,
     loading,
     searching,
     error,
     notice,
     setNotice,
     search,
-    setSearch,
+    setSearch: changeSearch,
     technicianCount,
     receptionistCount: allStaff.length - technicianCount,
     reload,

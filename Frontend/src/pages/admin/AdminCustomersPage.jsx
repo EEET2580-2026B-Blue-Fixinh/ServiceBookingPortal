@@ -22,19 +22,23 @@ export function AdminCustomersPage() {
       <CustomerSearch
         value={customers.search}
         onChange={customers.setSearch}
-        matchCount={customers.customers.length}
+        matchCount={customers.matchCount}
         totalCount={customers.total}
       />
 
       <CustomerList
         customers={customers.customers}
         total={customers.total}
+        matchCount={customers.matchCount}
         loading={customers.loading}
         provinceNames={customers.provinceNames}
         activeCount={customers.activeCount}
         deactivatedCount={customers.deactivatedCount}
         pendingId={activate.pendingId}
         onRequestToggle={activate.requestToggle}
+        page={customers.page}
+        pageSize={customers.pageSize}
+        onPageChange={customers.setPage}
       />
 
       <ActivateConfirmModal

@@ -1,3 +1,4 @@
+import { Pagination } from '../../../shared/Pagination'
 import { CustomerCard } from './CustomerCard'
 
 function StatCard({ label, value }) {
@@ -13,12 +14,16 @@ function StatCard({ label, value }) {
 export function CustomerList({
   customers,
   total,
+  matchCount,
   loading,
   provinceNames,
   activeCount,
   deactivatedCount,
   pendingId,
   onRequestToggle,
+  page,
+  pageSize,
+  onPageChange,
 }) {
   return (
     <>
@@ -59,10 +64,18 @@ export function CustomerList({
             </tbody>
           </table>
 
-          {customers.length === 0 && (
+          {matchCount === 0 ? (
             <p className="px-[18px] py-10 text-center text-bk-muted">
               {total === 0 ? 'No customers yet.' : 'No customers match your search.'}
             </p>
+          ) : (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              totalItems={matchCount}
+              itemNoun="customers"
+              onPageChange={onPageChange}
+            />
           )}
         </div>
       )}

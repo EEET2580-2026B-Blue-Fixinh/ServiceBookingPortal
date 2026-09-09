@@ -52,7 +52,7 @@ export function AdminStaffPage() {
       <StaffSearch
         value={staff.search}
         onChange={staff.setSearch}
-        matchCount={staff.staff.length}
+        matchCount={staff.matchCount}
         totalCount={staff.total}
         searching={staff.searching}
       />
@@ -60,11 +60,15 @@ export function AdminStaffPage() {
       <StaffList
         staff={staff.staff}
         total={staff.total}
+        matchCount={staff.matchCount}
         loading={staff.loading}
         technicianCount={staff.technicianCount}
         receptionistCount={staff.receptionistCount}
         loadingStaffId={form.loadingStaffId}
         onEdit={form.openEdit}
+        page={staff.page}
+        pageSize={staff.pageSize}
+        onPageChange={staff.setPage}
       />
 
       <StaffForm
