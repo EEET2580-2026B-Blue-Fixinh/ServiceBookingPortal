@@ -37,6 +37,7 @@ export const API_ENDPOINTS = {
   REFERENCE: {
     PROVINCES: "/reference/provinces",
     REPAIR_SERVICES: "/reference/repair-services",
+    RATING_CATEGORIES: "/reference/rating-categories",
   },
 
   // A booking belongs to whoever's token creates it (Section 7) — none of these
@@ -51,6 +52,12 @@ export const API_ENDPOINTS = {
     DETAIL: (bookingRef) => `/bookings/${encodeURIComponent(bookingRef)}`,
     CANCEL: (bookingRef) =>
       `/bookings/${encodeURIComponent(bookingRef)}/cancellation`,
+    RATING: (bookingRef) =>
+      `/bookings/${encodeURIComponent(bookingRef)}/rating`,
+  },
+  RATINGS: {
+    CREATE: "/ratings",
+    DETAIL: (ratingId) => `/ratings/${encodeURIComponent(ratingId)}`,
   },
   // The signed-in caller's own notifications (API Documentation Section 9). Every
   // one of these acts on whoever the token names; none of them takes a recipient.

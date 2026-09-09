@@ -109,6 +109,17 @@ public enum ErrorCode {
 	UPLOAD_FAILED(HttpStatus.BAD_GATEWAY,
 			"The images could not be uploaded, so nothing was changed. Please try again."),
 
+	// --- Top-level: ratings (API Documentation §8) ---
+	SCORE_OUT_OF_RANGE(HttpStatus.BAD_REQUEST, "Every rating score must be between 1 and 5."),
+	SUBCATEGORY_SET_INCOMPLETE(HttpStatus.BAD_REQUEST,
+			"Send every rating category, or omit subcategory scores entirely."),
+	RATING_ALREADY_EXISTS(HttpStatus.CONFLICT,
+			"This booking already has a rating."),
+	BOOKING_NOT_COMPLETED(HttpStatus.CONFLICT,
+			"Only a completed booking may be rated."),
+	RATING_NOT_FOUND(HttpStatus.NOT_FOUND, "No live rating exists with this identifier."),
+	ACCESS_DENIED(HttpStatus.FORBIDDEN, "You do not have access to this resource."),
+
 	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
 			"The staff account was created, but the welcome email could not be sent. "
 					+ "It will be retried automatically."),

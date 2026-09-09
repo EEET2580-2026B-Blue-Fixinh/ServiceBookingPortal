@@ -11,6 +11,8 @@ import org.springframework.data.mongodb.core.index.Index;
 import org.springframework.data.mongodb.core.index.IndexField;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.index.IndexOperations;
+import org.springframework.data.mongodb.core.index.PartialIndexFilter;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Component;
 
 import com.fixinh.sbp.common.security.blacklist.BlacklistedToken;
@@ -19,6 +21,7 @@ import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.admin.model.Administrator;
 import com.fixinh.sbp.modules.booking.model.ServiceBooking;
 import com.fixinh.sbp.modules.notification.model.Notification;
+import com.fixinh.sbp.modules.rating.model.Rating;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,6 +56,8 @@ public class ShardIndexInitializer {
         ensureNotificationIndexes(north, Region.NORTH);
         ensureBookingIndexes(south, Region.SOUTH);
         ensureBookingIndexes(north, Region.NORTH);
+        ensureRatingIndexes(south, Region.SOUTH);
+        ensureRatingIndexes(north, Region.NORTH);
         ensureAdministratorIndexes(south);
         ensureBlacklistIndexes(south, Region.SOUTH);
         ensureBlacklistIndexes(north, Region.NORTH);
@@ -86,6 +91,24 @@ public class ShardIndexInitializer {
         }
         catch (RuntimeException ex) {
             log.warn("Could not ensure booking indexes on {} shard", region, ex);
+        }
+    }
+
+    private void ensureRatingIndexes(MongoTemplate template, Region region) {
+        try {
+            IndexOperations indexes = template.indexOps(Rating.class);
+            indexes.createIndex(new Index().on("bookingRef", Sort.Direction.ASC).unique()
+                    .partial(PartialIndexFilter.of(Criteria.where("deletedAt").is(null)))
+                    .named("one_live_rating_per_booking"));
+            indexes.createIndex(new Index().on("customerId", Sort.Direction.ASC)
+                    .on("submittedAt", Sort.Direction.DESC));
+            indexes.createIndex(new Index().on("serviceId", Sort.Direction.ASC)
+                    .on("submittedAt", Sort.Direction.DESC));
+            indexes.createIndex(new Index().on("technicians.technicianId", Sort.Direction.ASC)
+                    .on("submittedAt", Sort.Direction.DESC));
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure rating indexes on {} shard", region, ex);
         }
     }
 

@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.dto.external.RepairServiceCatalogDto;
+import com.fixinh.sbp.modules.reference.dto.external.RatingCategoryDto;
 
 /**
  * The small, slow-changing lists that populate dropdowns (API Documentation Section 5).
@@ -23,4 +24,6 @@ public interface ReferenceExternalService {
 	 *                    when false, the filter panel can still name a service on an old booking.
 	 */
 	RepairServiceCatalogDto listRepairServices(boolean activeOnly);
+
+	List<RatingCategoryDto> listRatingCategories();
 }

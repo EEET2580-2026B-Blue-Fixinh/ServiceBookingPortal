@@ -1,4 +1,3 @@
 package com.fixinh.sbp.modules.reference.dto.external;
 
-public class RatingCategoryDto {
-}
+public record RatingCategoryDto(String categoryName) {}

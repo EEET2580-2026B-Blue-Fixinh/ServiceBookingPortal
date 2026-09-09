@@ -6,6 +6,7 @@ import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
+import com.fixinh.sbp.common.smp.dto.SmpRatingBookingDto;
 
 /**
  * What SBP needs from SMP for the booking domain (API Documentation §12.1 create a booking,
@@ -46,4 +47,11 @@ public interface SmpBookingClient {
 	 */
 	SmpCancellationDto cancelBooking(
 			String bookingRef, String currentStatus, SmpCancellationRequest request);
+
+	/**
+	 * Reads the authoritative fields needed before accepting a rating (§12.3). Until SMT
+	 * publishes that endpoint, the mock echoes the supplied SBP projection. A live client must
+	 * ignore {@code localProjection} and fetch the booking from SMP.
+	 */
+	SmpRatingBookingDto findBookingForRating(SmpRatingBookingDto localProjection);
 }
