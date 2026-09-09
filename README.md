@@ -24,7 +24,7 @@ Tailwind.
 | Customer profile | WIP | WIP | `GET`/`PUT /customers/me` not written |
 | Admin | WIP | WIP | Route guard only; no admin pages, no endpoints |
 | Ratings | WIP | WIP | Package scaffolding only |
-| Notifications / WebSocket | WIP | WIP | Config bean exists; no broadcaster logic |
+| Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. The channel is wired end to end; the events that raise a push (§11.7) are still to come |
 | SMP integration | WIP | — | Client interfaces exist; mock and live are both empty |
 | Cloudinary image relay | WIP | WIP | Config bound, service not implemented |
 | Google OAuth | WIP | WIP | Properties bound only |
@@ -39,7 +39,12 @@ a place to land without conflicting on package creation.
 | `POST` | `/api/v1/auth/register` | public |
 | `POST` | `/api/v1/auth/login` | public |
 | `GET` | `/api/v1/reference/provinces` | public |
+| `GET` | `/api/v1/notifications` | `CUSTOMER`, `ADMIN` — own notifications only |
+| `PATCH` | `/api/v1/notifications/{id}/read`, `/api/v1/notifications/read-all` | `CUSTOMER`, `ADMIN` |
+| `GET` | `/ws` (+ SockJS transport paths under it) | public handshake; the JWT is checked on the STOMP CONNECT frame |
 | `GET` | `/actuator/health`, `/actuator/info` | public |
+
+Each branch adds its own rows here; the table is not exhaustive.
 
 Everything else is closed by default — `.anyRequest().authenticated()`, so an endpoint added
 later is protected unless it is deliberately opened in
@@ -88,9 +93,9 @@ no secret is committed.
 | `JWT_SECRET` | dev placeholder | Signing key, 32 bytes minimum |
 | `JWT_ISSUER` | `fixinh-sbp` | Rejected if it does not match on validation |
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | `1` | Also what `/auth/login` reports as `expiresIn` |
-| `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | localhost | The two regional Atlas clusters |
+| `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | **none — required** | The two regional Atlas clusters. The only variables with no default: startup fails without them; the STOMP round-trip test skips itself and the context-load test fails |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
-| `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards |
+| `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards. The same list gates the `/ws` handshake |
 | `EMAIL_MODE` | `file` | `file` = write to disk, send nothing; `smtp` = send for real. Inert on `dev`, which pins the mode — see below |
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | `no-reply@fixinh.vn` / `Fixinh` | Envelope sender of the staff welcome email |
 | `EMAIL_OUTBOX_DIR` | `target/mail` | Where `file` mode writes. Git-ignored; `mvn clean` clears it |
@@ -116,7 +121,9 @@ Use a sandbox provider that captures mail rather than delivering it. No credenti
 `application.yml`, and none is committed.
 
 Frontend config lives in [env.js](Frontend/src/config/env.js), read from `.env` — API base URL
-and the login page's demo-account shortcut (`VITE_SHOW_DEMO_ACCOUNT`).
+(`VITE_API_URL`), the real-time channel's URL (`VITE_WS_URL`, `http://…/ws` — SockJS negotiates
+the transport from an HTTP handshake, so not `ws://`) and the login page's demo-account shortcut
+(`VITE_SHOW_DEMO_ACCOUNT`).
 
 Profiles: `dev` (single PC, SSL off, SMP mocked) and `integration` (multi-VM, SSL on, live SMP).
 
@@ -154,11 +161,15 @@ while a request with no token at all is answered by `JsonAuthenticationEntryPoin
 ### Frontend
 
 ```
-components/  auth, booking, shared (form, icons)
+components/  auth, booking, shared (form, icons, notifications, ToastStack)
 config/      env.js, constants.js
 context/     AuthContext — owns the session and its deadline
-pages/       auth, booking, routes (guards)
+             NotificationContext — the notification list, and the real-time channel's lifetime
+             ToastContext — the app-wide toast queue that ToastStack draws
+hooks/       useNotifications (re-exported from the Context), useMyBookings, useVietnamAddress
+pages/       auth, booking, admin, routes (guards)
 services/    api/apiClient.js + endpoints/
+             webSocketService.js — the only module that imports @stomp/stompjs or sockjs-client
 ```
 
 Components call endpoint modules, never `fetch` — the base URL, the `Authorization` header and
@@ -174,6 +185,26 @@ New **public** endpoints under `endpoints/` should pass `{ auth: false }`, as
 `authEndpoints.js` does: the JWT filter runs for the whole chain, so a stale token attached to
 an otherwise-public request still 401s it.
 
+**Real-time notifications (§9.3).** A notification is *saved first and delivered second*: the
+store is the record, the socket is a courtesy. `NotificationGateway.push` hands a saved
+notification to `convertAndSendToUser(recipientId, "/queue/notifications", …)`; a customer who
+is not connected simply has no session to reach, and catches up from `GET /notifications` on
+their next load or reconnect. The channel is outbound-only (Appendix E #1 settled as REST push):
+clients never send, and the backend refuses SEND frames and any subscription other than the
+caller's own queue.
+
+Authentication is at the STOMP layer, not the HTTP one. SockJS cannot put a header on the
+handshake, so `/ws` is open in `SecurityConfig` and the bearer token travels in the CONNECT
+frame, where `StompAuthChannelInterceptor` applies the same checks as the HTTP filter (parse,
+expiry, blacklist). A rejected frame gets an ERROR whose `message` header is the error code, as
+§2.7 does for HTTP.
+
+On the client, `NotificationProvider` opens the socket for exactly as long as a customer is
+signed in — administrators receive no notifications and get no socket — and turns a pushed
+message into the newest unread row and a toast: one push, one row, one toast, deduplicated by
+id against the list. Reconnection backs off from 1 s to 30 s and re-reads the list once it is
+back.
+
 ---
 
 ## Known gaps
@@ -183,7 +214,18 @@ an otherwise-public request still 401s it.
 - `AUTH_ACCOUNT_DEACTIVATED` (403) has no client handling; the `ApiError` reaches the calling
   page unchanged.
 - Manual sign-out does not sync across tabs (expiry does — every tab arms its own timer).
-- No tests beyond the generated context-load test.
+- The real-time channel is stateful: a customer is bound to the instance holding their
+  socket. Fine for one instance; a second needs sticky sessions or a shared broker
+  (Appendix E #9).
+- An open socket is not re-validated when its token rotates or is revoked elsewhere; it
+  re-authenticates on its next connect, and a revoked session ends through the HTTP path.
+- No STOMP heartbeats. SockJS's own keep-alive frames cover idle proxies, and a backend restart
+  closes the socket outright, which is what triggers the reconnect.
+- The page-level `Toast` (top-centre, per page) predates the design mockup; the shared
+  `ToastStack` is the mockup's. Pages should migrate their success messages to `useToast`.
+- Backend tests: `./mvnw test` runs the unit suites anywhere; the tests that bring up the
+  application (`SbpApplicationTests`, the STOMP round trip) need the two Atlas URIs and are
+  skipped or fail without them. The frontend has no test runner yet.
 
 ---
 
