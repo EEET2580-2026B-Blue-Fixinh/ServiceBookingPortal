@@ -33,3 +33,8 @@ export async function fetchRepairServices({ activeOnly = true } = {}) {
   const response = await apiClient.get(path)
   return response.items
 }
+
+export async function fetchRatingCategories() {
+  const response = await apiClient.get(API_ENDPOINTS.REFERENCE.RATING_CATEGORIES)
+  return response.items
+}

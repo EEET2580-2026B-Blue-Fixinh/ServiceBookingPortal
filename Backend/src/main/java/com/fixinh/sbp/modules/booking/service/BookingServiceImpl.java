@@ -39,6 +39,7 @@ import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalServi
 import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
+import com.fixinh.sbp.modules.rating.interfaces.internal.RatingInternalService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -67,6 +68,7 @@ public class BookingServiceImpl implements BookingExternalService {
 	private final CustomerExternalService customerService;
 	private final ServiceBookingRepository bookingRepository;
 	private final ImageStorageService imageStorage;
+	private final RatingInternalService ratingService;
 	/** Only for turning a stored provinceCode into the name §7.3 publishes (Req A.2.4). */
 	private final ReferenceExternalService referenceService;
 	@Override
@@ -245,8 +247,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				toAddressDto(booking.getServiceAddress()),
 				toBillDto(booking.getBill()),
 				toCancellationDto(booking),
-				// No rating module yet, so false is accurate rather than a placeholder.
-				false,
+				ratingService.hasLiveRating(booking.getBookingRef()),
 				booking.getCreatedAt());
 	}
 
@@ -400,9 +401,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				scheduled ? booking.getEstimatedDurationMinutes() : null,
 				scheduled && technicians != null && !technicians.isEmpty() ? technicians : null,
 				completed && booking.getBill() != null ? booking.getBill().totalCost() : null,
-				// No rating module yet — every booking genuinely has none, so false is accurate
-				// today, not a placeholder. Revisit once ratings exist to check for real.
-				false,
+				ratingService.hasLiveRating(booking.getBookingRef()),
 				// No sync pipeline updates a booking after creation yet (no §11.7 receiver), so
 				// createdAt is the last moment this projection is known to have been correct.
 				booking.getCreatedAt());

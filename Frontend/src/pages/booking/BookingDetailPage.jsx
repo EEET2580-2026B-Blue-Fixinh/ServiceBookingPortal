@@ -10,6 +10,7 @@ import {
 } from "../../components/booking/bookingPresentation";
 import { MaterialIcon } from "../../components/shared/icons";
 import { Toast } from "../../components/shared/Toast";
+import { RatingCard } from "../../components/booking/RatingCard";
 import { ROUTES } from "../../config/constants";
 import {
   cancelBooking,
@@ -299,6 +300,10 @@ export function BookingDetailPage() {
           )}
 
           <BillCard bill={booking.bill} />
+
+          {booking.status === "COMPLETED" && (
+            <RatingCard bookingRef={booking.bookingRef} hasRating={booking.hasRating} onChanged={reload} />
+          )}
 
           {booking.cancellation && (
             <Card title="Cancellation">

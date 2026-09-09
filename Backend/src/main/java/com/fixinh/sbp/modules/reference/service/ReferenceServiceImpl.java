@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.dto.external.RepairServiceCatalogDto;
+import com.fixinh.sbp.modules.reference.dto.external.RatingCategoryDto;
 import com.fixinh.sbp.modules.reference.dto.external.ServiceTypeDto;
 import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
 import com.fixinh.sbp.modules.reference.model.Province;
@@ -26,6 +27,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ReferenceServiceImpl implements ReferenceExternalService {
+	private static final List<RatingCategoryDto> RATING_CATEGORIES = List.of(
+			new RatingCategoryDto("Integrity"), new RatingCategoryDto("Quality"),
+			new RatingCategoryDto("Friendliness"));
 
 	/**
 	 * Built once: the catalogue is immutable for the life of the process. No database read —
@@ -62,6 +66,11 @@ public class ReferenceServiceImpl implements ReferenceExternalService {
 				.toList();
 
 		return new RepairServiceCatalogDto(items, syncStatus.lastSyncedAt());
+	}
+
+	@Override
+	public List<RatingCategoryDto> listRatingCategories() {
+		return RATING_CATEGORIES;
 	}
 
 	private static ServiceTypeDto toDto(RepairServiceType service) {

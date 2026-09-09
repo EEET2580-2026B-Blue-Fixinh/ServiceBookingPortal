@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fixinh.sbp.common.dto.ListResponse;
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.dto.external.RepairServiceCatalogDto;
+import com.fixinh.sbp.modules.reference.dto.external.RatingCategoryDto;
 import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
 
 import lombok.RequiredArgsConstructor;
@@ -45,5 +46,10 @@ public class ReferenceController {
 	public RepairServiceCatalogDto listRepairServices(
 			@RequestParam(defaultValue = "true") boolean activeOnly) {
 		return referenceService.listRepairServices(activeOnly);
+	}
+
+	@GetMapping("/rating-categories")
+	public ListResponse<RatingCategoryDto> listRatingCategories() {
+		return new ListResponse<>(referenceService.listRatingCategories());
 	}
 }

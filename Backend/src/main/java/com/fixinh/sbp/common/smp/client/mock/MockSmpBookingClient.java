@@ -14,6 +14,7 @@ import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
+import com.fixinh.sbp.common.smp.dto.SmpRatingBookingDto;
 
 /**
  * Stands in for SMP until Team SMT's API is available (API Documentation §13, Req 4.S2). A fixed
@@ -102,5 +103,13 @@ public class MockSmpBookingClient implements SmpBookingClient {
 		};
 
 		return new SmpCancellationDto(bookingRef, resulting, request.cancelledAt());
+	}
+
+	@Override
+	public SmpRatingBookingDto findBookingForRating(SmpRatingBookingDto localProjection) {
+		// SMT has not published GET /bookings/{bookingRef}. In mock mode, SBP's synced
+		// projection is the fixture; this keeps the rating flow usable once a booking-status
+		// fixture/event marks a booking COMPLETED.
+		return localProjection;
 	}
 }
