@@ -1,10 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { toastFor } from '../components/shared/notifications/notificationPresentation'
+import { ROLES } from '../config/constants'
 import {
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from '../services/api/endpoints/notificationEndpoints'
+import { connectWebSocket } from '../services/webSocketService'
 import { useAuth } from './AuthContext'
+import { useToast } from './ToastContext'
 
 // The notification slice of application state: the caller's own notification list,
 // its unread count, the two ways of clearing it, and the one way something new gets
@@ -14,6 +18,12 @@ import { useAuth } from './AuthContext'
 // reader: the badge and the panel need the new row, and a toast needs to show it on
 // whatever page the customer happens to be on. State owned by the bell would exist
 // only while the bell is mounted and be visible only to it.
+//
+// The channel itself is opened and closed here too, because its lifetime is the
+// session's and its only consumer is this state. Milestone 1 draws it as the
+// WebSocket client delivering to the Toast Notifier; in code the client is
+// webSocketService, this provider is the delivery, and the toast queue is the
+// notifier.
 //
 // The list and the count live in one state object rather than two, because they
 // have to agree: marking one read has to move both, and two setState calls can be
@@ -82,7 +92,8 @@ function withReceived(data, pushed) {
 }
 
 export function NotificationProvider({ children }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user, token } = useAuth()
+  const { showToast } = useToast()
 
   const [data, setData] = useState(EMPTY)
   const [status, setStatus] = useState('loading')
@@ -100,6 +111,16 @@ export function NotificationProvider({ children }) {
   // if that number is no longer current — without it a slow refresh fired on open
   // can land after a quick one fired on return and reinstate what it replaced.
   const requestIdRef = useRef(0)
+
+  // The access token, readable by the socket at the moment it (re)connects rather
+  // than captured when the effect below ran. The session rotates its token
+  // silently; a reconnect after a backend restart must carry the current one. A
+  // ref, not a dependency: making the socket effect depend on `token` would tear
+  // the connection down and rebuild it on every rotation for no benefit.
+  const tokenRef = useRef(token)
+  useEffect(() => {
+    tokenRef.current = token
+  }, [token])
 
   const applyData = useCallback((next) => {
     if (next === dataRef.current) return
@@ -219,14 +240,54 @@ export function NotificationProvider({ children }) {
 
   /**
    * A message pushed over the real-time channel, in the §9.3 shape. Becomes the
-   * newest unread row without a request; ignored if it is already in the list.
+   * newest unread row without a request, and raises a toast for it.
+   *
+   * One push, one row, one toast. A push for a notification the list already has
+   * — the §9.1 catch-up got there first, or the same message arrived twice — does
+   * nothing at all, so the customer is never told the same thing two ways.
    */
   const receive = useCallback(
     (pushed) => {
-      applyData(withReceived(dataRef.current, pushed))
+      const before = dataRef.current
+      const next = withReceived(before, pushed)
+      if (next === before) return
+
+      applyData(next)
+      showToast(toastFor(pushed))
     },
-    [applyData],
+    [applyData, showToast],
   )
+
+  // Customers only. An administrator's session would be accepted by the backend
+  // but has nothing to receive — no notification is ever addressed to one (§9.1
+  // answers them with an empty page) — so opening a socket for it would be a
+  // connection held for nothing.
+  const isCustomerSession = isAuthenticated && user?.role === ROLES.CUSTOMER
+
+  // The real-time channel (§9.3), open for exactly as long as a customer is signed
+  // in. The cleanup is the sign-out path: it closes the socket and stops
+  // reconnection, so a session that ended on purpose is not quietly re-opened a
+  // second later with a token that no longer exists.
+  //
+  // `load` and `receive` are stable across token rotations (neither depends on
+  // the token), so this effect re-runs only when the session starts or ends.
+  useEffect(() => {
+    if (!isCustomerSession) return undefined
+
+    const channel = connectWebSocket({
+      getToken: () => tokenRef.current,
+      onMessage: receive,
+      // A reconnect means a gap. Nothing pushed during it was queued for this
+      // socket — the store is the record — so the list is re-read (§9.3: "fall
+      // back to §9.1 on reconnect"). The first connect needs no catch-up; the
+      // mount effect above has already loaded the list.
+      onConnected: ({ reconnected }) => {
+        if (reconnected) load()
+      },
+    })
+
+    return () => channel.disconnect()
+  }, [isCustomerSession, receive, load])
 
   // Silent, for opening the panel or returning to the tab: the list on screen stays
   // put while it runs. `retry` is the visible one, for the error state's button.
