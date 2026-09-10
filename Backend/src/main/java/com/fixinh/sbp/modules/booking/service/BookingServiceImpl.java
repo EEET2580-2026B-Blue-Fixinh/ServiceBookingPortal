@@ -15,6 +15,7 @@ import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.smp.client.SmpBookingClient;
+import com.fixinh.sbp.common.smp.dto.SmpBookingCreateRequest;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
@@ -37,6 +38,7 @@ import com.fixinh.sbp.modules.booking.model.TechnicianRef;
 import com.fixinh.sbp.modules.booking.repository.ServiceBookingRepository;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
+import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
 import com.fixinh.sbp.modules.reference.interfaces.external.ReferenceExternalService;
 import com.fixinh.sbp.modules.rating.interfaces.internal.RatingInternalService;
@@ -82,9 +84,26 @@ public class BookingServiceImpl implements BookingExternalService {
 				.orElseThrow(() -> new IllegalStateException(
 						"Authenticated customer " + customerId + " has no profile."));
 
+		Address serviceAddress = toAddress(command.serviceAddress());
+
 		// SMP owns the booking record and generates the reference (§2.8, §13) — but a reference
 		// is not taken on trust, because a mock's sequence is not durable the way SMP's is.
-		SmpBookingDto ack = createWithUnusedReference(customerId, service.serviceId());
+		SmpBookingDto ack = createWithUnusedReference(SmpBookingCreateRequest.fromSbp(
+				customerId,
+				customerFullName(customerId),
+				service.serviceId(),
+				command.issueDescription().trim(),
+				command.preferredServiceDate(),
+				command.availableStartTime(),
+				command.availableEndTime(),
+				new SmpBookingCreateRequest.Address(
+						serviceAddress.getStreetNumber(),
+						serviceAddress.getStreetName(),
+						serviceAddress.getWard(),
+						serviceAddress.getProvinceCode(),
+						// SMP stores the name it is handed and has no province list to resolve
+						// a code against, so the name is resolved on this side or not at all.
+						resolveProvinceName(serviceAddress.getProvinceCode()))));
 		BookingStatus status = BookingStatus.valueOf(ack.status());
 		ServiceBooking booking = ServiceBooking.builder()
 				.bookingRef(ack.bookingRef())
@@ -96,7 +115,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				.preferredServiceDate(command.preferredServiceDate())
 				.availableStartTime(command.availableStartTime())
 				.availableEndTime(command.availableEndTime())
-				.serviceAddress(toAddress(command.serviceAddress()))
+				.serviceAddress(serviceAddress)
 				.status(status)
 				.createdAt(ack.createdAt())
 				.homeRegion(homeRegion)
@@ -261,19 +280,11 @@ public class BookingServiceImpl implements BookingExternalService {
 		if (address == null) {
 			return null;
 		}
-		String provinceName = referenceService.listProvinces().stream()
-				.filter(province -> province.provinceCode().equals(address.getProvinceCode()))
-				.map(ProvinceDto::provinceName)
-				.findFirst()
-				// A code with no province behind it can only come from data written before the
-				// list changed. Showing the code beats showing nothing.
-				.orElse(address.getProvinceCode());
-
 		return new BookingDetailDto.AddressDto(
 				address.getStreetNumber(),
 				address.getStreetName(),
 				address.getWard(),
-				provinceName);
+				resolveProvinceName(address.getProvinceCode()));
 	}
 
 	/** Absent until the technician issues it, which §7.3 says is ordinary and not an error. */
@@ -421,12 +432,18 @@ public class BookingServiceImpl implements BookingExternalService {
 	 * instant on a reference that also happens to be stale", and the {@link DuplicateKeyException}
 	 * catch below turns even that into a retryable answer rather than a fault.
 	 *
+	 * <p><b>Against a live SMP this loop is not free.</b> SMT writes the booking before it
+	 * answers, so every rejected reference leaves a row behind on their side that no customer
+	 * will ever see. That is tolerable only because their reference is a random four-digit
+	 * number with no uniqueness check of its own — raised with Team SMT; when they make the
+	 * sequence durable and unique, this loop should shrink to a single attempt.
+	 *
 	 * @throws ApiException 503 SMP_UNAVAILABLE once the attempts are spent — §7.1's own wording
 	 *         fits: nothing was created, nothing is half-written, and the customer may retry
 	 */
-	private SmpBookingDto createWithUnusedReference(String customerId, String serviceId) {
+	private SmpBookingDto createWithUnusedReference(SmpBookingCreateRequest request) {
 		for (int attempt = 1; attempt <= MAX_REFERENCE_ATTEMPTS; attempt++) {
-			SmpBookingDto ack = smpBookingClient.createBooking(customerId, serviceId);
+			SmpBookingDto ack = smpBookingClient.createBooking(request);
 			if (!bookingRepository.existsByBookingRef(ack.bookingRef())) {
 				return ack;
 			}
@@ -455,6 +472,31 @@ public class BookingServiceImpl implements BookingExternalService {
 		if (!end.isAfter(start) || Duration.between(start, end).toMinutes() < MINIMUM_WINDOW_MINUTES) {
 			throw new ApiException(ErrorCode.TIME_WINDOW_INVALID);
 		}
+	}
+
+	/**
+	 * The province name behind a stored code — for §7.3's booking detail, and for the booking
+	 * SBP hands SMP, which stores the name rather than resolving one.
+	 */
+	private String resolveProvinceName(String provinceCode) {
+		return referenceService.listProvinces().stream()
+				.filter(province -> province.provinceCode().equals(provinceCode))
+				.map(ProvinceDto::provinceName)
+				.findFirst()
+				// A code with no province behind it can only come from data written before the
+				// list changed. Showing the code beats showing nothing.
+				.orElse(provinceCode);
+	}
+
+	/**
+	 * SMP records the customer's name on the booking it owns, and refuses a booking without
+	 * one. SBP is the only side that has it, so it is read here rather than left to SMP.
+	 */
+	private String customerFullName(String customerId) {
+		return customerService.findById(customerId)
+				.map(Customer::getFullName)
+				.orElseThrow(() -> new IllegalStateException(
+						"Authenticated customer " + customerId + " has no profile."));
 	}
 
 	private Address toAddress(BookingCreateCommand.AddressCommand address) {

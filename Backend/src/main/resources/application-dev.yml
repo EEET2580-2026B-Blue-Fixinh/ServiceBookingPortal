@@ -1,10 +1,14 @@
 # Req 5.S1: single-PC dev environment. Both shards point at the same local
-# mongod instance (different database names), and SMP is mocked so SBP runs
-# standalone before SMP is reachable (Req 4.S2).
+# mongod instance (different database names), and SMP is mocked by default so
+# SBP still runs standalone (Req 4.S2).
 fixinh:
   sbp:
     smp:
-      mode: mock
+      # Mock unless asked otherwise. This was a bare "mock" while there was no
+      # SMP to reach; now that Team SMT's service runs on 9443, SMP_MODE=live
+      # has to be able to reach this profile -- dev is the default profile, so
+      # a hardcoded value here silently overrode the env var everywhere.
+      mode: ${SMP_MODE:mock}
     email:
       # Stated explicitly rather than inherited. The acceptance criterion for
       # Req 3.1.S5 is that the dev profile sends nothing externally, and a rule

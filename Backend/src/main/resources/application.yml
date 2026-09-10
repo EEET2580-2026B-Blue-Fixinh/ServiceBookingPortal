@@ -58,7 +58,15 @@ fixinh:
       # SMP. "mock" serves local JSON fixtures so SBP can run standalone;
       # "live" calls the real SMP REST API. Switched per environment below.
       mode: ${SMP_MODE:mock}
-      base-url: ${SMP_BASE_URL:http://localhost:8081/api}
+      # Team SMT's service listens on 9443 and mounts everything under /api/v1
+      # (their README, "API contract"). In "live" mode this is only partly live:
+      # the catalogue and booking creation are real HTTP calls, cancellation is
+      # still answered inside SBP because SMT publishes no endpoint for it --
+      # see LocalCancellationRule for what that costs.
+      base-url: ${SMP_BASE_URL:http://localhost:9443/api/v1}
+      # The bearer token SMT expects on every call. Their development default;
+      # a real one belongs in the environment, never in this file.
+      service-token: ${SMP_SERVICE_TOKEN:local-integration-token}
       webhook-shared-secret: ${SMP_WEBHOOK_SECRET:dev-only-shared-secret}
 
     cors:

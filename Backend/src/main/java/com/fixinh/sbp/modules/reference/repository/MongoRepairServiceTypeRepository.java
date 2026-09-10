@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.reference.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,5 +45,11 @@ public class MongoRepairServiceTypeRepository implements RepairServiceTypeReposi
 	public Optional<RepairServiceType> findByServiceId(String serviceId) {
 		Query query = Query.query(Criteria.where("serviceId").is(serviceId));
 		return Optional.ofNullable(template.findOne(query, RepairServiceType.class));
+	}
+
+	@Override
+	public long deleteByServiceIdNotIn(Collection<String> serviceIds) {
+		Query query = Query.query(Criteria.where("serviceId").nin(serviceIds));
+		return template.remove(query, RepairServiceType.class).getDeletedCount();
 	}
 }
