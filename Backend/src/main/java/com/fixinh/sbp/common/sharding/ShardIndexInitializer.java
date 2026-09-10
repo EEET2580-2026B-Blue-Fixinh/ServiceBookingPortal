@@ -283,6 +283,16 @@ public class ShardIndexInitializer {
                     .on("deliveryStatus", Sort.Direction.ASC)
                     .on("lastAttemptAt", Sort.Direction.ASC));
 
+            // One notification per SMP event (§11.7, Req 3.3.U2). The service looks the event
+            // up before it writes; this is what holds when two replays of the same event
+            // arrive together and both find nothing. Sparse, because everything not raised
+            // from an event carries no id here, and a unique index that counted nulls would
+            // permit exactly one such notification in each store.
+            indexes.createIndex(new Index()
+                    .on("sourceEventId", Sort.Direction.ASC)
+                    .unique()
+                    .sparse());
+
             log.info("Notification indexes ensured on {} shard ({})", region,
                     template.getDb().getName());
         }
