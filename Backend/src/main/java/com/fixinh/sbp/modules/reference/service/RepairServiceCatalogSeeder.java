@@ -20,10 +20,10 @@ import lombok.extern.slf4j.Slf4j;
  * Seeds SBP's local repair-service catalogue on every boot (Phase 3.1, "seed database with
  * service catalog"; API Documentation §5.2, §12.5).
  *
- * <p>Upserts by {@code serviceId} rather than inserting blindly, so restarting the app — or the
- * fixed catalogue in {@code MockSmpBookingClient} changing later — never leaves stale duplicates
- * behind. Runs against whichever {@link SmpBookingClient} is active (mock today, live once §12 is
- * agreed — see §13.1), so nothing here changes when that switch flips.
+ * <p>Upserts by {@code serviceId} rather than inserting blindly, so restarting the app never
+ * leaves stale duplicates behind, and then deletes whatever SMP no longer lists — SBP's copy is
+ * a replica, so it has to be able to shrink as well as grow. Runs against whichever
+ * {@link SmpBookingClient} is active, so nothing here changes when that switch flips.
  *
  * <p>{@code description} is never touched by a sync: SMP's catalogue carries no such field (see
  * {@link SmpRepairServiceDto}), so an existing entry's copy is preserved across restarts rather
@@ -48,10 +48,37 @@ public class RepairServiceCatalogSeeder implements ApplicationRunner {
 			repository.save(toEntity(entry, existing));
 		}
 
+		long removed = pruneEntriesSmpNoLongerHas(catalogue);
+
 		syncStatus.recordSync(Instant.now());
 
-		log.info("Repair-service catalogue seeded: {} entr{} synced from SMP.",
-				catalogue.size(), catalogue.size() == 1 ? "y" : "ies");
+		log.info("Repair-service catalogue seeded: {} entr{} synced from SMP, {} removed.",
+				catalogue.size(), catalogue.size() == 1 ? "y" : "ies", removed);
+	}
+
+	/**
+	 * Deletes what SMP no longer lists. Upserting alone lets the replica grow but never shrink,
+	 * so a service SMP drops — or, as happened on the switch from the mock catalogue to the live
+	 * one, a whole set of identifiers that only ever existed locally — stays bookable in SBP
+	 * forever.
+	 *
+	 * <p>Safe for bookings already made against a removed service: {@code ServiceBooking} stores
+	 * its own {@code serviceName} and {@code baseServiceFee} at creation time and never reads
+	 * them back from this collection.
+	 *
+	 * <p>An <b>empty</b> catalogue prunes nothing. SMP returning nothing at all is far more
+	 * likely to be a fault on their side than a real answer, and wiping the collection on it
+	 * would take the booking screen down with it.
+	 */
+	private long pruneEntriesSmpNoLongerHas(List<SmpRepairServiceDto> catalogue) {
+		if (catalogue.isEmpty()) {
+			log.warn("SMP returned an empty catalogue; keeping the existing entries rather than "
+					+ "clearing the collection.");
+			return 0;
+		}
+
+		List<String> known = catalogue.stream().map(SmpRepairServiceDto::serviceId).toList();
+		return repository.deleteByServiceIdNotIn(known);
 	}
 
 	/**

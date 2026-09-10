@@ -5,11 +5,9 @@ import java.time.Year;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.springframework.stereotype.Component;
-
-import com.fixinh.sbp.common.exception.ApiException;
-import com.fixinh.sbp.common.exception.ErrorCode;
+import com.fixinh.sbp.common.smp.client.LocalCancellationRule;
 import com.fixinh.sbp.common.smp.client.SmpBookingClient;
+import com.fixinh.sbp.common.smp.dto.SmpBookingCreateRequest;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
@@ -20,8 +18,10 @@ import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
  * catalogue and an always-succeeding booking creation — enough to develop and demo the booking
  * flow end to end. Swapped for a live implementation behind {@link SmpBookingClient} once SMP,
  * and its real prices, exist; nothing outside the two implementations needs to change.
+ *
+ * <p>Registered by {@code SmpClientConfig} under {@code fixinh.sbp.smp.mode=mock} rather than by
+ * component scan, so that setting the mode to {@code live} actually takes this bean out.
  */
-@Component
 public class MockSmpBookingClient implements SmpBookingClient {
 
 	/**
@@ -66,7 +66,7 @@ public class MockSmpBookingClient implements SmpBookingClient {
 	}
 
 	@Override
-	public SmpBookingDto createBooking(String customerId, String serviceId) {
+	public SmpBookingDto createBooking(SmpBookingCreateRequest request) {
 		return new SmpBookingDto(nextReference(), "CREATED", Instant.now());
 	}
 
@@ -87,20 +87,13 @@ public class MockSmpBookingClient implements SmpBookingClient {
 	 * The three scenarios §13.2 requires of the cancellation mock — cancel from Scheduled,
 	 * terminate from Working, and a refusal from Completed — expressed as the rule §12.4 puts on
 	 * SMP's side rather than as fixture rows, because the rule is total: every one of Appendix
-	 * A's eight statuses has exactly one answer here.
+	 * A's eight statuses has exactly one answer here. The live client answers from the same
+	 * {@link LocalCancellationRule}, because SMT has published no cancellation endpoint to ask.
 	 */
 	@Override
 	public SmpCancellationDto cancelBooking(
 			String bookingRef, String currentStatus, SmpCancellationRequest request) {
 
-		String resulting = switch (currentStatus) {
-			case "CREATED", "CONFIRMED", "SCHEDULED" -> "CANCELLED_BY_CUSTOMER";
-			case "WORKING" -> "TERMINATED_BY_CUSTOMER";
-			// COMPLETED, and anything already cancelled or aborted. §12.4 asks for a
-			// distinguishable 409 so SBP can say why rather than showing a generic failure.
-			default -> throw new ApiException(ErrorCode.BOOKING_NOT_CANCELLABLE);
-		};
-
-		return new SmpCancellationDto(bookingRef, resulting, request.cancelledAt());
+		return LocalCancellationRule.apply(bookingRef, currentStatus, request.cancelledAt());
 	}
 }

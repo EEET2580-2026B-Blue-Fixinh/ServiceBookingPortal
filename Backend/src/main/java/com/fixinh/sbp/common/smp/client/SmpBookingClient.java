@@ -2,6 +2,7 @@ package com.fixinh.sbp.common.smp.client;
 
 import java.util.List;
 
+import com.fixinh.sbp.common.smp.dto.SmpBookingCreateRequest;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
@@ -26,8 +27,12 @@ public interface SmpBookingClient {
 	 * Forwards a booking a customer just submitted. SMP owns the record and generates
 	 * {@code bookingRef}; SBP keeps only a projection of it (§7, "Behaviour when SMP is
 	 * unavailable").
+	 *
+	 * <p>The whole booking goes across, not just the two ids it once did: SMT persists the
+	 * customer's name, the issue, the window and the address itself, and rejects the request
+	 * outright when any of them is missing.
 	 */
-	SmpBookingDto createBooking(String customerId, String serviceId);
+	SmpBookingDto createBooking(SmpBookingCreateRequest request);
 
 	/**
 	 * Records a cancellation the customer made in SBP (§12.4, Req 3.3.M1).

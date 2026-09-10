@@ -1,5 +1,6 @@
 package com.fixinh.sbp.modules.reference.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,4 +27,14 @@ public interface RepairServiceTypeRepository {
 
 	/** Looked up by SMP's catalogue identifier, never Mongo's internal id. */
 	Optional<RepairServiceType> findByServiceId(String serviceId);
+
+	/**
+	 * Removes every entry whose {@code serviceId} is not in {@code serviceIds} — how
+	 * {@code RepairServiceCatalogSeeder} lets the replica shrink when SMP's catalogue does.
+	 *
+	 * @param serviceIds the identifiers SMP just returned; never empty, because deleting on an
+	 *        empty catalogue would clear the collection
+	 * @return how many entries were removed
+	 */
+	long deleteByServiceIdNotIn(Collection<String> serviceIds);
 }

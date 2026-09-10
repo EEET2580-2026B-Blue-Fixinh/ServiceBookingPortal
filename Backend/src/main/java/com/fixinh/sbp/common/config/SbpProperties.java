@@ -100,6 +100,14 @@ public class SbpProperties {
 		private String mode = "mock";
 		private String baseUrl;
 		private String webhookSharedSecret;
+
+		/**
+		 * The shared bearer token SMP checks on every call. A static secret rather than an
+		 * OAuth2 credential because that is what SMT's service accepts today; it can be
+		 * replaced without any endpoint or DTO changing. Required when {@code mode} is
+		 * {@code live}, unused when it is {@code mock}.
+		 */
+		private String serviceToken;
 	}
 
 	/**
