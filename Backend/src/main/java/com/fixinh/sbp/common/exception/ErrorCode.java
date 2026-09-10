@@ -118,7 +118,6 @@ public enum ErrorCode {
 	BOOKING_NOT_COMPLETED(HttpStatus.CONFLICT,
 			"Only a completed booking may be rated."),
 	RATING_NOT_FOUND(HttpStatus.NOT_FOUND, "No live rating exists with this identifier."),
-	ACCESS_DENIED(HttpStatus.FORBIDDEN, "You do not have access to this resource."),
 
 	EMAIL_DELIVERY_FAILED(HttpStatus.BAD_GATEWAY,
 			"The staff account was created, but the welcome email could not be sent. "

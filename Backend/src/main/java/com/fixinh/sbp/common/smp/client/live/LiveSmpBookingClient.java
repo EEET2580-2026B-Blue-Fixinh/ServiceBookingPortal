@@ -14,6 +14,7 @@ import com.fixinh.sbp.common.smp.dto.SmpBookingCreateRequest;
 import com.fixinh.sbp.common.smp.dto.SmpBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationDto;
 import com.fixinh.sbp.common.smp.dto.SmpCancellationRequest;
+import com.fixinh.sbp.common.smp.dto.SmpRatingBookingDto;
 import com.fixinh.sbp.common.smp.dto.SmpRepairServiceDto;
 
 import lombok.extern.slf4j.Slf4j;
@@ -130,8 +131,65 @@ public class LiveSmpBookingClient implements SmpBookingClient {
 		return LocalCancellationRule.apply(bookingRef, currentStatus, request.cancelledAt());
 	}
 
+	/**
+	 * Live, and deliberately so: §12.3 exists because the rating gate — is this caller the
+	 * customer, and is the booking COMPLETED — must be answered by the side that owns the
+	 * record, not by SBP's own projection of it.
+	 *
+	 * <p>{@code localProjection} is used for one field only. SMT's booking response carries no
+	 * technician assignment (their README lists it as pending), so the technicians on the rating
+	 * snapshot can only come from SBP's projection. Every field the gate turns on —
+	 * {@code customerId}, {@code status} — comes from SMP.
+	 *
+	 * <p><b>Known limitation while SMT's flow is incomplete:</b> nothing in their service moves a
+	 * booking to COMPLETED, so in live mode a rating submission will be refused with
+	 * BOOKING_NOT_COMPLETED every time. That is the honest answer rather than a false pass, and
+	 * it resolves itself when they implement completion.
+	 */
+	@Override
+	public SmpRatingBookingDto findBookingForRating(SmpRatingBookingDto localProjection) {
+		String bookingRef = localProjection.bookingRef();
+		try {
+			BookingResponse response = http.get()
+					.uri("/bookings/{bookingRef}", bookingRef)
+					.retrieve()
+					.body(BookingResponse.class);
+
+			if (response == null || response.status() == null) {
+				log.error("SMP returned no usable booking for {}.", bookingRef);
+				throw new ApiException(ErrorCode.SMP_UNAVAILABLE);
+			}
+			return new SmpRatingBookingDto(
+					response.bookingRef(),
+					response.customerId(),
+					response.serviceId(),
+					response.serviceName(),
+					response.status(),
+					localProjection.technicians());
+		}
+		catch (RestClientResponseException ex) {
+			if (ex.getStatusCode().value() == 404) {
+				log.warn("SMP does not know booking {}, which SBP has a projection of.", bookingRef);
+				throw new ApiException(ErrorCode.BOOKING_NOT_FOUND);
+			}
+			log.error("SMP refused the booking lookup for {}: {} {}",
+					bookingRef, ex.getStatusCode(), ex.getResponseBodyAsString());
+			throw new ApiException(ErrorCode.SMP_UNAVAILABLE);
+		}
+		catch (RestClientException ex) {
+			log.error("SMP could not be reached to look up booking {}.", bookingRef, ex);
+			throw new ApiException(ErrorCode.SMP_UNAVAILABLE);
+		}
+	}
+
 	/** SMT wraps the catalogue in {@code items}, unlike its single-resource responses. */
 	private record CatalogueResponse(List<CatalogueEntry> items) {
+	}
+
+	/** The fields of SMT's booking response that the rating gate needs; the rest is ignored. */
+	private record BookingResponse(
+			String bookingRef, String customerId, String serviceId, String serviceName,
+			String status) {
 	}
 
 	/**
