@@ -17,6 +17,12 @@ import com.fixinh.sbp.modules.notification.model.RecipientType;
  * @param message           the text the recipient reads, already composed
  * @param bookingRef        the booking this concerns, or null. Null is dropped from the §9.1
  *                          response rather than published as a null field
+ * @param sourceEventId     the SMP event this comes from (§11.7's {@code eventId}), or null
+ *                          when it comes from anything else. <b>Naming it is what makes the
+ *                          command safe to repeat:</b> the service raises one notification per
+ *                          event, however many times the event is delivered. Without it every
+ *                          call is a new notification, because there is nothing to recognise a
+ *                          repeat by
  */
 public record NotificationCreateCommand(
 		RecipientType recipientType,
@@ -24,7 +30,8 @@ public record NotificationCreateCommand(
 		String provinceCode,
 		NotificationType type,
 		String message,
-		String bookingRef) {
+		String bookingRef,
+		String sourceEventId) {
 
 	public NotificationCreateCommand {
 		if (recipientType == null) {
@@ -45,11 +52,36 @@ public record NotificationCreateCommand(
 		}
 	}
 
+	/** A notification that comes from no SMP event, and so has no id to be repeated under. */
+	public NotificationCreateCommand(RecipientType recipientType, String recipientIdentifier,
+			String provinceCode, NotificationType type, String message, String bookingRef) {
+		this(recipientType, recipientIdentifier, provinceCode, type, message, bookingRef, null);
+	}
+
 	/** Something happened to a customer's booking, and their bell should show it (Req 3.3.U2). */
 	public static NotificationCreateCommand forCustomerBooking(String customerId,
 			NotificationType type, String message, String bookingRef) {
 
 		return new NotificationCreateCommand(RecipientType.CUSTOMER, customerId, null, type,
 				message, bookingRef);
+	}
+
+	/**
+	 * SMP reported a change to a customer's booking (§11.7), and their bell should show it —
+	 * once, however many times SMP reports it.
+	 *
+	 * @throws IllegalArgumentException for a blank event id. A command that claims to come
+	 *         from an event but cannot say which one would be filed as a new notification on
+	 *         every replay, which is the exact outcome this factory exists to prevent
+	 */
+	public static NotificationCreateCommand forBookingEvent(String eventId, String customerId,
+			NotificationType type, String message, String bookingRef) {
+
+		if (eventId == null || eventId.isBlank()) {
+			throw new IllegalArgumentException(
+					"A notification raised from an SMP event needs that event's id.");
+		}
+		return new NotificationCreateCommand(RecipientType.CUSTOMER, customerId, null, type,
+				message, bookingRef, eventId);
 	}
 }
