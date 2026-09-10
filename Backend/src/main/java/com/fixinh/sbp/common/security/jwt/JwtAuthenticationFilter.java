@@ -17,6 +17,7 @@ import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.security.blacklist.TokenBlacklistRepository;
+import com.fixinh.sbp.common.security.integration.IntegrationAuthenticationFilter;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -49,6 +50,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	 */
 	@Qualifier("handlerExceptionResolver")
 	private final HandlerExceptionResolver handlerExceptionResolver;
+
+	/**
+	 * The integration paths carry SMP's shared secret in the same header (§11.1), and
+	 * {@code IntegrationAuthenticationFilter} decides those. Reading the secret here would
+	 * reject it as a malformed JWT with a 401 before that filter ever saw it.
+	 */
+	@Override
+	protected boolean shouldNotFilter(HttpServletRequest request) {
+		return IntegrationAuthenticationFilter.covers(request);
+	}
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
