@@ -8,7 +8,8 @@ export function StaffSearch({ value, onChange, sortBy, sortOptions, onSortChange
       <div className="flex flex-1 items-center gap-2 rounded-[9px] border border-bk-border bg-bk-bg px-3 focus-within:border-bk-teal focus-within:ring-[3px] focus-within:ring-bk-teal-soft">
         <MaterialIcon name="search" className="shrink-0 text-[19px] text-bk-muted" />
         <input
-          type="text"
+          type="search"
+          aria-label="Search staff by name, staff ID or email"
           placeholder="Search by name, staff ID or email"
           value={value}
           onChange={(event) => onChange(event.target.value)}

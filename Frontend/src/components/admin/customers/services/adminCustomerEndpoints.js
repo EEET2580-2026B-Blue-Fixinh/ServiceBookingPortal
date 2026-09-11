@@ -1,6 +1,6 @@
 import { apiClient } from '../../../../services/api/apiClient'
 
-// Admin-only, requires an ADMIN bearer token (API Documentation Section 10.4-10.5).
+// Admin-only, requires an ADMIN bearer token (API Documentation Section 10.1-10.3).
 
 export async function fetchCustomers() {
   const response = await apiClient.get('/admin/customers')

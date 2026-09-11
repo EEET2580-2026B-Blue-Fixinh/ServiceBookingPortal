@@ -53,33 +53,35 @@ export function CustomerList({
           <p className="px-[18px] py-10 text-center text-bk-muted">Loading customers…</p>
         ) : (
           <>
-            <table className="w-full table-fixed border-collapse text-left text-[14px]">
-              <colgroup>
-                <col className="w-[46%]" />
-                <col className="w-[20%]" />
-                <col className="w-[16%]" />
-                <col className="w-[18%]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-bk-border bg-bk-bg text-[11px] font-bold uppercase tracking-[0.06em] text-bk-muted">
-                  <th className="px-[18px] py-3">Customer</th>
-                  <th className="px-[18px] py-3">City</th>
-                  <th className="px-[18px] py-3">Status</th>
-                  <th className="px-[18px] py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer) => (
-                  <CustomerCard
-                    key={customer.customerId}
-                    customer={customer}
-                    cityName={provinceNames[customer.address?.provinceCode] ?? customer.address?.provinceCode}
-                    pending={pendingId === customer.customerId}
-                    onRequestToggle={onRequestToggle}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-[14px]">
+                <colgroup>
+                  <col className="w-[46%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[18%]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-bk-border bg-bk-bg text-[11px] font-bold uppercase tracking-[0.06em] text-bk-muted">
+                    <th className="px-[18px] py-3">Customer</th>
+                    <th className="px-[18px] py-3">City</th>
+                    <th className="px-[18px] py-3">Status</th>
+                    <th className="px-[18px] py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((customer) => (
+                    <CustomerCard
+                      key={customer.customerId}
+                      customer={customer}
+                      cityName={provinceNames[customer.address?.provinceCode] ?? customer.address?.provinceCode}
+                      pending={pendingId === customer.customerId}
+                      onRequestToggle={onRequestToggle}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {matchCount === 0 ? (
               <p className="px-[18px] py-10 text-center text-bk-muted">

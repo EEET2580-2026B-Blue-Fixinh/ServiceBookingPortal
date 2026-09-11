@@ -54,34 +54,36 @@ export function StaffList({
           <p className="px-[18px] py-10 text-center text-bk-muted">Loading staff…</p>
         ) : (
           <>
-            <table className="w-full table-fixed border-collapse text-left text-[14px]">
-              <colgroup>
-                <col className="w-[42%]" />
-                <col className="w-[16%]" />
-                <col className="w-[22%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-bk-border bg-bk-bg text-[11px] font-bold uppercase tracking-[0.06em] text-bk-muted">
-                  <th className="px-[18px] py-3">Staff member</th>
-                  <th className="px-[18px] py-3">Role</th>
-                  <th className="px-[18px] py-3">Branch</th>
-                  <th className="px-[18px] py-3">Status</th>
-                  <th className="px-[18px] py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map((member) => (
-                  <StaffCard
-                    key={member.staffId}
-                    member={member}
-                    loading={loadingStaffId === member.staffId}
-                    onEdit={onEdit}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-[14px]">
+                <colgroup>
+                  <col className="w-[42%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-bk-border bg-bk-bg text-[11px] font-bold uppercase tracking-[0.06em] text-bk-muted">
+                    <th className="px-[18px] py-3">Staff member</th>
+                    <th className="px-[18px] py-3">Role</th>
+                    <th className="px-[18px] py-3">Branch</th>
+                    <th className="px-[18px] py-3">Status</th>
+                    <th className="px-[18px] py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staff.map((member) => (
+                    <StaffCard
+                      key={member.staffId}
+                      member={member}
+                      loading={loadingStaffId === member.staffId}
+                      onEdit={onEdit}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {matchCount === 0 ? (
               <p className="px-[18px] py-10 text-center text-bk-muted">

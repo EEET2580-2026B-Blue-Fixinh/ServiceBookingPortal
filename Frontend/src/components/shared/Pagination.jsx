@@ -32,7 +32,10 @@ export function Pagination({ page, pageSize, totalItems, itemNoun, onPageChange 
   const go = (target) => onPageChange(Math.min(Math.max(target, 1), pageCount))
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-bk-border px-[18px] py-3 text-[13px] text-bk-muted">
+    <nav
+      aria-label="Pagination"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-bk-border px-[18px] py-3 text-[13px] text-bk-muted"
+    >
       <p>Rows per page: {pageSize}</p>
 
       <p className="font-mono text-[12.5px]">
@@ -102,6 +105,6 @@ export function Pagination({ page, pageSize, totalItems, itemNoun, onPageChange 
           <MaterialIcon name="last_page" className="text-[18px]" />
         </button>
       </div>
-    </div>
+    </nav>
   )
 }
