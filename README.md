@@ -1,5 +1,7 @@
 # Fixinh — Service Booking Portal (SBP)
 
+<!-- Test comment to verify the commit and push workflow. -->
+
 Customer-facing half of the Fixinh repair platform: customers register, sign in, and manage
 their repair bookings. The Service Management Portal (SMP) owns bookings, technicians and
 staff; SBP consumes them over REST and is currently mocked so it runs standalone.
@@ -230,6 +232,9 @@ back.
 ---
 
 ## Working on it
+
+For the split between outbound outbox work (#55) and the inbound booking-event receiver
+(§11.7, Req 3.3.U2), see [SMP integration scope](docs/smp-integration-scope.md).
 
 Repo: [EEET2580-2026B-Blue-Fixinh/Service-Booking](https://github.com/EEET2580-2026B-Blue-Fixinh/Service-Booking).
 Feature branches (`dev/auth`, `dev/booking`, `dev/admin`, `setup/mongodb`) merge into `main`
