@@ -1,15 +1,7 @@
 import { Pagination } from '../../../shared/Pagination'
+import { StatCard } from '../../../shared/StatCard'
 import { StaffCard } from './StaffCard'
 import { StaffSearch } from './StaffSearch'
-
-function StatCard({ label, value }) {
-  return (
-    <div className="flex-1 rounded-xl border border-bk-border bg-bk-surface p-[18px]">
-      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-bk-muted">{label}</p>
-      <p className="text-[26px] font-extrabold text-bk-text">{value}</p>
-    </div>
-  )
-}
 
 /** The stat cards plus the staff table and its search/sort toolbar (Req 3.5.S1). */
 export function StaffList({
@@ -24,12 +16,16 @@ export function StaffList({
   page,
   pageSize,
   onPageChange,
+  pageSizeOptions,
+  onPageSizeChange,
   search,
   onSearchChange,
   searching,
   sortBy,
   sortOptions,
   onSortChange,
+  error,
+  onRetry,
 }) {
   return (
     <>
@@ -52,6 +48,17 @@ export function StaffList({
 
         {loading ? (
           <p className="px-[18px] py-10 text-center text-bk-muted">Loading staff…</p>
+        ) : error && total === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-[18px] py-10 text-center">
+            <p className="text-bk-red">Couldn't load staff accounts.</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 text-[13px] font-bold text-bk-text hover:border-bk-teal hover:bg-bk-teal-soft"
+            >
+              Try again
+            </button>
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -96,6 +103,8 @@ export function StaffList({
                 totalItems={matchCount}
                 itemNoun="staff accounts"
                 onPageChange={onPageChange}
+                pageSizeOptions={pageSizeOptions}
+                onPageSizeChange={onPageSizeChange}
               />
             )}
           </>

@@ -19,11 +19,16 @@ const NAV_BUTTON =
   'text-bk-text hover:border-bk-teal hover:bg-bk-teal-soft disabled:opacity-40 ' +
   'disabled:hover:border-bk-border disabled:hover:bg-bk-surface'
 
-/**
- * Client-side pagination footer for the admin tables. `pageSize` is fixed by the
- * caller; `itemNoun` is the plural label shown in "Showing 1 to 5 of 42 <noun>".
- */
-export function Pagination({ page, pageSize, totalItems, itemNoun, onPageChange }) {
+
+export function Pagination({
+  page,
+  pageSize,
+  totalItems,
+  itemNoun,
+  onPageChange,
+  pageSizeOptions,
+  onPageSizeChange,
+}) {
   const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
   const current = Math.min(page, pageCount)
   const firstRow = totalItems === 0 ? 0 : (current - 1) * pageSize + 1
@@ -36,7 +41,24 @@ export function Pagination({ page, pageSize, totalItems, itemNoun, onPageChange 
       aria-label="Pagination"
       className="flex flex-wrap items-center justify-between gap-3 border-t border-bk-border px-[18px] py-3 text-[13px] text-bk-muted"
     >
-      <p>Rows per page: {pageSize}</p>
+      {pageSizeOptions && onPageSizeChange ? (
+        <label className="flex items-center gap-1.5">
+          Rows per page:
+          <select
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            className="rounded-[7px] border border-bk-border bg-bk-surface px-1.5 py-1 text-[13px] text-bk-text focus:border-bk-teal focus:outline-none"
+          >
+            {pageSizeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <p>Rows per page: {pageSize}</p>
+      )}
 
       <p className="font-mono text-[12.5px]">
         {totalItems === 0

@@ -60,12 +60,16 @@ export function AdminStaffPage() {
         page={staff.page}
         pageSize={staff.pageSize}
         onPageChange={staff.setPage}
+        pageSizeOptions={staff.pageSizeOptions}
+        onPageSizeChange={staff.setPageSize}
         search={staff.search}
         onSearchChange={staff.setSearch}
         searching={staff.searching}
         sortBy={staff.sortBy}
         sortOptions={staff.sortOptions}
         onSortChange={staff.setSortBy}
+        error={staff.error}
+        onRetry={staff.reload}
       />
 
       <StaffForm
