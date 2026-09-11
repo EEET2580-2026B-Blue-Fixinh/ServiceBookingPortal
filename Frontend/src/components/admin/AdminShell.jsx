@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/admin' },
   { key: 'customers', label: 'Customers', icon: 'group', to: '/admin/customers' },
   { key: 'staff', label: 'Staff & technicians', icon: 'engineering', to: '/admin/staff' },
-  { key: 'account', label: 'My account', icon: 'account_circle' },
 ]
 
 function getInitials(fullName) {
