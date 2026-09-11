@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchCustomers } from '../services/adminCustomerEndpoints'
 import { fetchProvinces } from '../../../../services/api/endpoints/referenceEndpoints'
-
-const PAGE_SIZE = 5
+import { usePagedList } from '../../../../hooks/usePagedList'
+import { byName, fieldFirst } from '../../../../utils/sortComparators'
 
 const NAME_SORTS = {
-  'Name (A–Z)': (a, b) => a.fullName.localeCompare(b.fullName),
-  'Name (Z–A)': (a, b) => b.fullName.localeCompare(a.fullName),
-  'Status (Active first)': (a, b) =>
-    a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? -1 : 1,
+  'Name (A–Z)': byName,
+  'Name (Z–A)': (a, b) => byName(b, a),
+  'Status (Active first)': fieldFirst('accountStatus', 'ACTIVE'),
   // Matches the "Deactivated" wording on CustomerCard's status pill, not the
   // raw "INACTIVE"-sounding accountStatus value.
-  'Status (Deactivated first)': (a, b) =>
-    a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? 1 : -1,
+  'Status (Deactivated first)': fieldFirst('accountStatus', 'DEACTIVATED'),
 }
 
 export const CUSTOMER_SORT_OPTIONS = [...Object.keys(NAME_SORTS), 'City (A–Z)']
@@ -27,10 +25,9 @@ export function useCustomers() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState(CUSTOMER_SORT_OPTIONS[0])
 
-  useEffect(() => {
+  const reload = () => {
     fetchCustomers()
       .then((data) => {
         setCustomers(data)
@@ -38,7 +35,11 @@ export function useCustomers() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+  }
 
+  useEffect(reload, [])
+
+  useEffect(() => {
     fetchProvinces()
       .then((provinces) =>
         setProvinceNames(Object.fromEntries(provinces.map((p) => [p.provinceCode, p.provinceName]))),
@@ -61,26 +62,24 @@ export function useCustomers() {
   const sorted = useMemo(() => {
     const comparator =
       sortBy === 'City (A–Z)'
-        ? (a, b) => cityOf(a).localeCompare(cityOf(b)) || a.fullName.localeCompare(b.fullName)
+        ? (a, b) => cityOf(a).localeCompare(cityOf(b)) || byName(a, b)
         : NAME_SORTS[sortBy]
     return [...filtered].sort(comparator)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, sortBy, provinceNames])
 
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const pageCustomers = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const paged = usePagedList(sorted)
 
-  // A new search makes the current page number meaningless, so it sends the
-  // reader back to the first page.
+  // A new search or sort makes the current page number meaningless, so it
+  // sends the reader back to the first page.
   const changeSearch = (value) => {
     setSearch(value)
-    setPage(1)
+    paged.resetPage()
   }
 
   const changeSort = (value) => {
     setSortBy(value)
-    setPage(1)
+    paged.resetPage()
   }
 
   const activeCount = customers.filter((c) => c.accountStatus === 'ACTIVE').length
@@ -92,12 +91,14 @@ export function useCustomers() {
   }
 
   return {
-    customers: pageCustomers,
+    customers: paged.pageItems,
     matchCount: filtered.length,
     total: customers.length,
-    page: currentPage,
-    pageSize: PAGE_SIZE,
-    setPage,
+    page: paged.page,
+    pageSize: paged.pageSize,
+    setPage: paged.setPage,
+    pageSizeOptions: paged.pageSizeOptions,
+    setPageSize: paged.setPageSize,
     loading,
     error,
     search,
@@ -109,5 +110,6 @@ export function useCustomers() {
     activeCount,
     deactivatedCount: customers.length - activeCount,
     replaceCustomer,
+    reload,
   }
 }

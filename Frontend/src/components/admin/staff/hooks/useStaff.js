@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchStaff } from '../services/adminStaffEndpoints'
+import { usePagedList } from '../../../../hooks/usePagedList'
+import { byName, fieldFirst } from '../../../../utils/sortComparators'
 
 const SEARCH_DEBOUNCE_MS = 300
-const PAGE_SIZE = 5
 
 const STAFF_SORTS = {
-  'Name (A–Z)': (a, b) => a.fullName.localeCompare(b.fullName),
-  'Name (Z–A)': (a, b) => b.fullName.localeCompare(a.fullName),
-  'Status (Active first)': (a, b) =>
-    a.employmentStatus === b.employmentStatus
-      ? a.fullName.localeCompare(b.fullName)
-      : a.employmentStatus === 'ACTIVE'
-        ? -1
-        : 1,
-  'Status (Inactive first)': (a, b) =>
-    a.employmentStatus === b.employmentStatus
-      ? a.fullName.localeCompare(b.fullName)
-      : a.employmentStatus === 'ACTIVE'
-        ? 1
-        : -1,
-  'Role (A–Z)': (a, b) => a.staffRole.localeCompare(b.staffRole) || a.fullName.localeCompare(b.fullName),
+  'Name (A–Z)': byName,
+  'Name (Z–A)': (a, b) => byName(b, a),
+  'Status (Active first)': fieldFirst('employmentStatus', 'ACTIVE'),
+  'Status (Inactive first)': fieldFirst('employmentStatus', 'INACTIVE'),
+  'Role (A–Z)': (a, b) => a.staffRole.localeCompare(b.staffRole) || byName(a, b),
   'Branch (A–Z)': (a, b) =>
-    (a.branchProvinceName ?? '').localeCompare(b.branchProvinceName ?? '') || a.fullName.localeCompare(b.fullName),
+    (a.branchProvinceName ?? '').localeCompare(b.branchProvinceName ?? '') || byName(a, b),
 }
 
 export const STAFF_SORT_OPTIONS = Object.keys(STAFF_SORTS)
@@ -40,10 +31,10 @@ export function useStaff() {
   const [searchResults, setSearchResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [searchError, setSearchError] = useState('')
   const [notice, setNotice] = useState(null)
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState(STAFF_SORT_OPTIONS[0])
   // Bumped on every successful reload so the active-search effect below
   // re-runs and refreshes searchResults too - otherwise an edit or create
@@ -58,31 +49,31 @@ export function useStaff() {
     fetchStaff()
       .then((data) => {
         setAllStaff(data)
-        setError('')
+        setLoadError('')
         setRefreshKey((key) => key + 1)
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false))
   }
 
   useEffect(reload, [])
 
   useEffect(() => {
+    const thisRequest = ++requestId.current
     const trimmed = search.trim()
     if (!trimmed) return
 
-    const thisRequest = ++requestId.current
     const timer = setTimeout(() => {
       setSearching(true)
       fetchStaff(trimmed)
         .then((data) => {
           if (thisRequest === requestId.current) {
             setSearchResults(data)
-            setError('')
+            setSearchError('')
           }
         })
         .catch((err) => {
-          if (thisRequest === requestId.current) setError(err.message)
+          if (thisRequest === requestId.current) setSearchError(err.message)
         })
         .finally(() => {
           if (thisRequest === requestId.current) setSearching(false)
@@ -99,32 +90,32 @@ export function useStaff() {
   const visibleStaff = search.trim() ? (searchResults ?? allStaff) : allStaff
   const sortedStaff = [...visibleStaff].sort(STAFF_SORTS[sortBy])
 
-  const pageCount = Math.max(1, Math.ceil(sortedStaff.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const pageStaff = sortedStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const paged = usePagedList(sortedStaff)
 
-  // A new search makes the current page number meaningless, so it sends the
-  // reader back to the first page.
+  // A new search or sort makes the current page number meaningless, so it
+  // sends the reader back to the first page.
   const changeSearch = (value) => {
     setSearch(value)
-    setPage(1)
+    paged.resetPage()
   }
 
   const changeSort = (value) => {
     setSortBy(value)
-    setPage(1)
+    paged.resetPage()
   }
 
   return {
-    staff: pageStaff,
+    staff: paged.pageItems,
     matchCount: visibleStaff.length,
     total: allStaff.length,
-    page: currentPage,
-    pageSize: PAGE_SIZE,
-    setPage,
+    page: paged.page,
+    pageSize: paged.pageSize,
+    setPage: paged.setPage,
+    pageSizeOptions: paged.pageSizeOptions,
+    setPageSize: paged.setPageSize,
     loading,
     searching,
-    error,
+    error: loadError || searchError,
     notice,
     setNotice,
     search,
