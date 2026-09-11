@@ -92,12 +92,25 @@ public class SbpProperties {
 	/**
 	 * Req 4.S2/4.M1/4.M3: Booking/Technician/Staff data is normally owned by SMP. {@code mode}
 	 * switches which {@code Smp*Client} beans are wired: "mock" serves local fixtures so SBP
-	 * runs standalone, "live" calls the real SMP API once it exists.
+	 * runs standalone, "live" calls the real SMP API once it exists. Staff are the exception
+	 * and follow {@link #staffMode} instead.
 	 */
 	@Getter
 	@Setter
 	public static class Smp {
 		private String mode = "mock";
+
+		/**
+		 * Which {@code SmpStaffClient} is wired, independently of {@link #mode}.
+		 *
+		 * <p>SMT's service serves bookings but publishes no staff API yet (API Documentation
+		 * §12.8 is still provisional). Tying staff to {@code mode} meant that the moment SBP
+		 * talked to the real SMP, creating a receptionist or technician failed outright — and
+		 * with it the welcome email of Req 3.1.S5. So staff stay on the mock by default until
+		 * SMT ships staff endpoints; then this becomes {@code live}.
+		 */
+		private String staffMode = "mock";
+
 		private String baseUrl;
 		private String webhookSharedSecret;
 

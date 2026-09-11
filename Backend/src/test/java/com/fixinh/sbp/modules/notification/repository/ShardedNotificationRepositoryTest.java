@@ -16,6 +16,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.UpdateDefinition;
@@ -179,6 +180,42 @@ class ShardedNotificationRepositoryTest {
 		assertTrue(captor.getValue().toString().contains("readStatus"));
 	}
 
+	// --- The retry sweep: one store down must not hide the other's backlog -----------------
+
+	@Test
+	void findsOutstandingEmailsInBothStoresSouthFirst() {
+		Notification inSouth = outstanding("SOUTH-1");
+		Notification inNorth = outstanding("NORTH-1");
+		when(south.find(any(Query.class), eq(Notification.class))).thenReturn(List.of(inSouth));
+		when(north.find(any(Query.class), eq(Notification.class))).thenReturn(List.of(inNorth));
+
+		assertEquals(List.of(inSouth, inNorth), repository.findOutstandingEmails(50));
+	}
+
+	@Test
+	void stillReturnsOneStoresBacklogWhenTheOtherIsDown() {
+		// A regional outage should delay that region's welcome emails and nobody else's. One
+		// combined query let an unreachable south store stop every email owed in the north.
+		Notification inNorth = outstanding("NORTH-1");
+		when(south.find(any(Query.class), eq(Notification.class)))
+				.thenThrow(new DataAccessResourceFailureException("south unreachable"));
+		when(north.find(any(Query.class), eq(Notification.class))).thenReturn(List.of(inNorth));
+
+		assertEquals(List.of(inNorth), repository.findOutstandingEmails(50));
+	}
+
+	@Test
+	void failsLoudlyWhenNeitherStoreAnswers() {
+		// An empty list would read as "nothing is owed" -- the one answer certain to be wrong
+		// when nothing could be read at all.
+		when(south.find(any(Query.class), eq(Notification.class)))
+				.thenThrow(new DataAccessResourceFailureException("south unreachable"));
+		when(north.find(any(Query.class), eq(Notification.class)))
+				.thenThrow(new DataAccessResourceFailureException("north unreachable"));
+
+		assertThrows(IllegalStateException.class, () -> repository.findOutstandingEmails(50));
+	}
+
 	// --- Refusing rather than defaulting ----------------------------------------------------
 
 	@Test
@@ -204,6 +241,13 @@ class ShardedNotificationRepositoryTest {
 		assertThrows(IllegalStateException.class, () -> repository.save(new Notification()));
 
 		verifyNoInteractions(south, north);
+	}
+
+	/** A row as the outstanding-email query would return it; only its identity matters here. */
+	private Notification outstanding(String id) {
+		Notification notification = new Notification();
+		notification.setId(id);
+		return notification;
 	}
 
 	private Query captureFind() {

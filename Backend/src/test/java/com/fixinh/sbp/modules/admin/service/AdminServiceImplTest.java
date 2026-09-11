@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.fixinh.sbp.common.exception.ApiException;
 import com.fixinh.sbp.common.exception.ErrorCode;
@@ -36,6 +37,7 @@ import com.fixinh.sbp.modules.auth.interfaces.internal.AuthInternalService;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.model.Customer;
+import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 import com.fixinh.sbp.modules.notification.interfaces.internal.NotificationInternalService;
 import com.fixinh.sbp.modules.reference.dto.external.ProvinceDto;
@@ -126,6 +128,31 @@ class AdminServiceImplTest {
 	}
 
 	@Test
+	void createStaffFilesTheWelcomeEmailUnderTheBranchSmpReturns() {
+		when(smpStaffClient.createStaff(any())).thenReturn(staff("TEC-100", "HN"));
+		when(notificationService.sendStaffWelcomeEmail(any()))
+				.thenReturn(new StaffWelcomeEmailResult("notif-1", true));
+
+		service.createStaff(createCommand()); // the request itself says HCM
+
+		assertEquals("HN", sentWelcomeEmail().branchProvinceCode(),
+				"the account is SMP's record, so SMP's branch wins");
+	}
+
+	@Test
+	void createStaffFallsBackToTheRequestedBranchWhenSmpOmitsIt() {
+		// §12.8 is provisional. Without the fallback, an account SMP has already created would
+		// come back as a 400 PROVINCE_CODE_INVALID, with no email and nothing left to retry.
+		when(smpStaffClient.createStaff(any())).thenReturn(staff("TEC-100", null));
+		when(notificationService.sendStaffWelcomeEmail(any()))
+				.thenReturn(new StaffWelcomeEmailResult("notif-1", true));
+
+		service.createStaff(createCommand());
+
+		assertEquals("HCM", sentWelcomeEmail().branchProvinceCode());
+	}
+
+	@Test
 	void updateStaffTranslatesAnUnknownIdIntoAnApiException() {
 		when(smpStaffClient.updateStaff(any(), any())).thenThrow(new NoSuchElementException("no such staff"));
 
@@ -179,6 +206,14 @@ class AdminServiceImplTest {
 		return new SmpStaffDto(staffId, "Some Name", staffId.toLowerCase() + "@fixinh.vn", "0900000000",
 				StaffRole.TECHNICIAN, EmploymentStatus.ACTIVE,
 				new SmpAddress("1", "Le Loi", "Phuong Ben Thanh", "HCM"), branchProvinceCode, null);
+	}
+
+	/** The command the admin module handed the notification module, exactly once. */
+	private StaffWelcomeEmailCommand sentWelcomeEmail() {
+		ArgumentCaptor<StaffWelcomeEmailCommand> captor =
+				ArgumentCaptor.forClass(StaffWelcomeEmailCommand.class);
+		verify(notificationService).sendStaffWelcomeEmail(captor.capture());
+		return captor.getValue();
 	}
 
 	private StaffCreateCommand createCommand() {

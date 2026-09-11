@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -245,6 +246,41 @@ class NotificationRetrySchedulerTest {
 
 		verify(emailClient).send(any(EmailMessage.class));
 		assertEquals(DeliveryStatus.SENT, undated.getDeliveryStatus());
+	}
+
+	// --- Faults stay with the row that caused them --------------------------------------
+
+	@Test
+	void aRowThatFailsDoesNotCostTheRestOfTheBatch() {
+		// The first row's store refuses the save. That is about the first row alone; the second
+		// is still owed its retry, and before this change it never got one.
+		Notification first = failed(1, 3);
+		Notification second = failed(1, 3);
+		doThrow(new IllegalStateException("store refused the write"))
+				.when(repository).save(first);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(first, second));
+
+		scheduler.retryOutstandingEmails();
+
+		verify(emailClient, times(2)).send(any(EmailMessage.class));
+		verify(repository).save(second);
+		assertEquals(DeliveryStatus.SENT, second.getDeliveryStatus());
+	}
+
+	@Test
+	void abandonsARowWhoseStoredMessageCanNeverBeSent() {
+		// An EMAIL row carrying an in-app type is corrupt: there is no subject to send it under,
+		// and no later sweep can change that. It has to end, not fail again every minute.
+		Notification corrupt = failed(1, 60);
+		corrupt.setType(NotificationType.BOOKING_CONFIRMED);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(corrupt));
+
+		scheduler.retryOutstandingEmails();
+
+		verify(emailClient, never()).send(any(EmailMessage.class));
+		assertEquals(DeliveryStatus.ABANDONED, corrupt.getDeliveryStatus());
+		assertNull(corrupt.getUndeliveredBody(), "abandoning still discards the password");
+		verify(repository).save(corrupt);
 	}
 
 	// --- Nothing to send -----------------------------------------------------------------

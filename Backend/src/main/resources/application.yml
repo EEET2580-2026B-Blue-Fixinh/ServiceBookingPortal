@@ -78,6 +78,12 @@ fixinh:
       # SMP. "mock" serves local JSON fixtures so SBP can run standalone;
       # "live" calls the real SMP REST API. Switched per environment below.
       mode: ${SMP_MODE:mock}
+      # Staff follow their own switch, not mode above. SMT's service serves bookings
+      # but has no staff API yet (API Doc section 12.8 is still provisional), so staff
+      # stay on the mock even when bookings go live -- otherwise creating a receptionist
+      # or technician, and the welcome email that follows (Req 3.1.S5), fails outright
+      # the moment SBP talks to the real SMP. Set to live once SMT ships staff endpoints.
+      staff-mode: ${SMP_STAFF_MODE:mock}
       # Team SMT's service listens on 9443 and mounts everything under /api/v1
       # (their README, "API contract"). In "live" mode this is only partly live:
       # the catalogue and booking creation are real HTTP calls, cancellation is

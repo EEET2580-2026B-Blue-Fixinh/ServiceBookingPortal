@@ -53,6 +53,17 @@ public class NotificationRetryScheduler {
 	 * <p>The initial delay keeps this away from startup. Nothing is urgent in the first half
 	 * minute, and a sweep firing while the application is still wiring itself together only
 	 * makes the logs harder to read — and every {@code @SpringBootTest} slower.
+	 *
+	 * <p><b>Each row stands alone.</b> A fault while handling one notification — most likely
+	 * its store refusing the save — is logged and the sweep moves on, because every row after
+	 * it is still owed an attempt. The failed row is left exactly as it was, so the next sweep
+	 * finds it again: the right answer to a transient fault. If its send had already gone
+	 * through when the save failed, that next sweep sends it a second time; at-least-once is
+	 * the price of never silently losing a welcome email.
+	 *
+	 * <p>A store that cannot be read at all is handled one level down, by the repository, which
+	 * returns the other store's rows. Only when neither answers does this throw, and Spring's
+	 * scheduler logs it and runs the next sweep on time.
 	 */
 	@Scheduled(
 			fixedDelayString = "${fixinh.sbp.email.retry.sweep-interval:PT1M}",
@@ -67,22 +78,31 @@ public class NotificationRetryScheduler {
 		Instant now = Instant.now();
 		int attempted = 0;
 		int abandoned = 0;
+		int failed = 0;
 
 		for (Notification notification : outstanding) {
-			if (notification.getAttemptCount() >= retry.getMaxAttempts()) {
-				giveUp(notification);
-				abandoned++;
+			try {
+				if (notification.getAttemptCount() >= retry.getMaxAttempts()) {
+					giveUp(notification, "it has already had all " + retry.getMaxAttempts()
+							+ " attempts");
+					abandoned++;
+				}
+				else if (isDue(notification, now)) {
+					attemptAgain(notification, now);
+					attempted++;
+				}
+				// Otherwise it is still inside its backoff window. Left alone, picked up later.
 			}
-			else if (isDue(notification, now)) {
-				attemptAgain(notification, now);
-				attempted++;
+			catch (RuntimeException ex) {
+				failed++;
+				log.error("Retry sweep could not finish notification {}; it stays outstanding "
+						+ "for the next sweep", notification.getId(), ex);
 			}
-			// Otherwise it is still inside its backoff window. Left alone, picked up later.
 		}
 
-		if (attempted > 0 || abandoned > 0) {
-			log.info("Retry sweep: {} outstanding, {} attempted, {} abandoned",
-					outstanding.size(), attempted, abandoned);
+		if (attempted > 0 || abandoned > 0 || failed > 0) {
+			log.info("Retry sweep: {} outstanding, {} attempted, {} abandoned, {} failed",
+					outstanding.size(), attempted, abandoned, failed);
 		}
 	}
 
@@ -121,19 +141,17 @@ public class NotificationRetryScheduler {
 	}
 
 	private void attemptAgain(Notification notification, Instant now) {
-		String body = notification.getUndeliveredBody();
-		if (body == null || notification.getRecipientAddress() == null) {
-			// Nothing left to resend. Should not happen -- recordSuccess and abandon are the
-			// only things that clear the body, and both are terminal -- but a row that can
-			// never be sent must not be reconsidered on every sweep forever.
-			log.error("Notification {} is outstanding but has no message left to send; "
-					+ "abandoning it", notification.getId());
-			giveUp(notification);
+		EmailMessage message;
+		try {
+			message = rebuildMessage(notification);
+		}
+		catch (IllegalArgumentException | IllegalStateException unsendable) {
+			// Nothing a later sweep could change: the stored row itself cannot become an email.
+			// Ending it here, rather than letting the sweep's own catch leave it outstanding,
+			// is what stops a broken row failing again every minute forever.
+			giveUp(notification, unsendable.getMessage());
 			return;
 		}
-
-		EmailMessage message = new EmailMessage(notification.getRecipientAddress(),
-				composer.subjectFor(notification.getType()), body);
 
 		try {
 			emailClient.send(message);
@@ -165,9 +183,40 @@ public class NotificationRetryScheduler {
 		notificationRepository.save(notification);
 	}
 
-	private void giveUp(Notification notification) {
-		log.error("Abandoning notification {} to {} - it is already past the {}-attempt cap",
-				notification.getId(), notification.getRecipientAddress(), retry.getMaxAttempts());
+	/**
+	 * The message a row still owes, rebuilt from what was stored with it.
+	 *
+	 * <p>The subject is derived from the type rather than stored — see
+	 * {@link StaffWelcomeEmailComposer#subjectFor} — so only the address and the body had to
+	 * survive the failed attempt.
+	 *
+	 * @throws IllegalStateException when there is nothing left to rebuild from. Should not
+	 *         happen: {@code recordSuccess} and {@code abandon} are the only things that clear
+	 *         the body, and both are terminal
+	 * @throws IllegalArgumentException when what is left cannot form an email — a blank
+	 *         address, or a type that is never emailed. {@code EmailMessage} and the composer
+	 *         raise these, and their messages name the field, never the body
+	 */
+	private EmailMessage rebuildMessage(Notification notification) {
+		if (notification.getUndeliveredBody() == null) {
+			throw new IllegalStateException("it is outstanding but has no message left to send");
+		}
+		if (notification.getType() == null) {
+			throw new IllegalStateException("it has no type, so there is no subject to send under");
+		}
+		return new EmailMessage(notification.getRecipientAddress(),
+				composer.subjectFor(notification.getType()), notification.getUndeliveredBody());
+	}
+
+	/**
+	 * Ends a row for good. Loud, because every abandoned welcome email is a staff account
+	 * whose owner was never told how to sign in, and a person has to act on it.
+	 *
+	 * @param reason why, for the log. Never includes the body — it holds an initial password
+	 */
+	private void giveUp(Notification notification, String reason) {
+		log.error("Abandoning notification {} to {}: {}", notification.getId(),
+				notification.getRecipientAddress(), reason);
 		notification.abandon();
 		notificationRepository.save(notification);
 	}

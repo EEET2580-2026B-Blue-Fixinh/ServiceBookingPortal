@@ -19,10 +19,13 @@ import com.fixinh.sbp.modules.notification.model.DeliveryStatus;
 import com.fixinh.sbp.modules.notification.model.Notification;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Notifications across the north and south stores.
  */
 @Repository
+@Slf4j
 public class ShardedNotificationRepository implements NotificationRepository {
 
 	private static final String FIELD_ID = "_id";
@@ -83,10 +86,40 @@ public class ShardedNotificationRepository implements NotificationRepository {
 				.limit(limit);
 
 		// Both stores, because a notification lives in exactly one of them and the sweeper has
-		// no recipient in hand to work out which.
-		List<Notification> outstanding = new ArrayList<>(south.find(query, Notification.class));
-		outstanding.addAll(north.find(query, Notification.class));
+		// no recipient in hand to work out which. Asked one at a time, so a store that is down
+		// costs only its own rows: the other store's emails are still owed, and still retried.
+		List<Notification> outstanding = new ArrayList<>();
+		boolean southAnswered = readOutstandingInto(outstanding, south, Region.SOUTH, query);
+		boolean northAnswered = readOutstandingInto(outstanding, north, Region.NORTH, query);
+
+		if (!southAnswered && !northAnswered) {
+			throw new IllegalStateException("Neither store answered the outstanding-email "
+					+ "query, so nothing can be retried on this sweep. Both failures are logged "
+					+ "above.");
+		}
 		return outstanding;
+	}
+
+	/**
+	 * Adds one store's outstanding emails to {@code into}, and says whether the store answered.
+	 *
+	 * <p>A failure is logged and swallowed here rather than thrown, the same way
+	 * {@code ReplicatedShardDirectoryRepository} treats one unreachable copy: an unreachable
+	 * store degrades its own region and nothing else. The sweeper cannot make that call itself
+	 * — it never learns which store a row came from — so the repository that does know makes it.
+	 */
+	private boolean readOutstandingInto(List<Notification> into, MongoTemplate store,
+			Region region, Query query) {
+
+		try {
+			into.addAll(store.find(query, Notification.class));
+			return true;
+		}
+		catch (RuntimeException ex) {
+			log.warn("The {} store did not answer the outstanding-email query; its emails wait "
+					+ "for the next sweep", region, ex);
+			return false;
+		}
 	}
 
 	@Override

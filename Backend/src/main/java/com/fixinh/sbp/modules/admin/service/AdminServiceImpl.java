@@ -161,13 +161,29 @@ public class AdminServiceImpl implements AdminInternalService {
 						created.email(),
 						created.staffRole().name(),
 						created.initialPassword(),
-						created.branchProvinceCode()));
+						branchProvinceFor(created, command)));
 
 		if (!emailResult.sent()) {
 			throw new ApiException(ErrorCode.EMAIL_DELIVERY_FAILED);
 		}
 
 		return StaffDto.created(created, true);
+	}
+
+	/**
+	 * The branch province the welcome email's notification is filed under: SMP's, when its
+	 * response carries one, otherwise the one the administrator sent.
+	 *
+	 * <p>SMP's answer wins because the account is SMP's record. The fallback exists because
+	 * §12.8 is provisional and does not promise SMP echoes the province back. Without it, a
+	 * response that omits the field would turn an account SMP has <i>already created</i> into
+	 * a 400 {@code PROVINCE_CODE_INVALID} — no email sent, and no notification for the retry
+	 * sweep to find. The administrator's code is a safe stand-in: {@link StaffCreateValidator}
+	 * checked it against the province list before SMP was ever called.
+	 */
+	private static String branchProvinceFor(SmpStaffDto created, StaffCreateCommand command) {
+		String fromSmp = created.branchProvinceCode();
+		return fromSmp == null || fromSmp.isBlank() ? command.branchProvinceCode() : fromSmp;
 	}
 
 	@Override

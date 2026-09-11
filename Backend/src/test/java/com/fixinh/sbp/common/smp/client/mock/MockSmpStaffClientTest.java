@@ -2,6 +2,7 @@ package com.fixinh.sbp.common.smp.client.mock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -75,6 +76,32 @@ class MockSmpStaffClientTest {
 		assertEquals(EmploymentStatus.ACTIVE, created.employmentStatus());
 		assertNotNull(created.initialPassword());
 		assertTrue(client.findStaff(created.staffId()).isPresent());
+	}
+
+	@Test
+	void createdIdsCarryTheRolePrefixAndSixHexDigits() {
+		String technician = client.createStaff(
+				createRequest("hex.tech@fixinh.vn", StaffRole.TECHNICIAN)).staffId();
+		String receptionist = client.createStaff(
+				createRequest("hex.rec@fixinh.vn", StaffRole.RECEPTIONIST)).staffId();
+
+		assertTrue(technician.matches("TEC-[0-9A-F]{6}"), technician);
+		assertTrue(receptionist.matches("REC-[0-9A-F]{6}"), receptionist);
+	}
+
+	@Test
+	void aRestartedMockDoesNotHandOutTheSameIdAgain() {
+		// Two instances stand in for one process before and after a restart, or for two
+		// developers on the shared clusters. A counter gave both TEC-056 -- an id the Shard
+		// Directory had already placed. Random ids repeat one time in sixteen million.
+		MockSmpStaffClient afterRestart = new MockSmpStaffClient(new JsonMapper());
+
+		String before = client.createStaff(
+				createRequest("before.restart@fixinh.vn", StaffRole.TECHNICIAN)).staffId();
+		String after = afterRestart.createStaff(
+				createRequest("after.restart@fixinh.vn", StaffRole.TECHNICIAN)).staffId();
+
+		assertNotEquals(before, after);
 	}
 
 	@Test

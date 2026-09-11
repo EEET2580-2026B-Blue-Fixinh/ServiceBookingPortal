@@ -4,6 +4,8 @@ fixinh:
   sbp:
     smp:
       mode: live
+      # Bookings only. Staff keep smp.staff-mode from application.yml, which stays
+      # mock until SMT publishes a staff API.
     email:
       # The only profile that sends for real (Req 3.1.S5).
       mode: smtp
