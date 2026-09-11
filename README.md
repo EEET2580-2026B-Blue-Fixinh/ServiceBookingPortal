@@ -24,10 +24,11 @@ Tailwind.
 | Reference data | ✅ | ✅ | `GET /reference/provinces` from an in-code catalogue |
 | My Bookings page | WIP | WIP | UI complete, still rendering `mockBookings.js` |
 | Customer profile | WIP | WIP | `GET`/`PUT /customers/me` not written |
-| Admin | WIP | WIP | Route guard only; no admin pages, no endpoints |
+| Admin | ✅ | ✅ | Customers: list, activate and deactivate. Staff: list, search, create, update — relayed to SMP, which is mocked (`SMP_STAFF_MODE`) |
+| Staff welcome email | ✅ | ✅ | Req 3.1.S5, §10.6: a letter on every staff creation, retried in the background. Written to `target/mail` on `dev`; sent for real with the `smtp` profile |
 | Ratings | WIP | WIP | Package scaffolding only |
 | Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. The channel is wired end to end; the events that raise a push (§11.7) are still to come |
-| SMP integration | WIP | — | Client interfaces exist; mock and live are both empty |
+| SMP integration | WIP | — | Bookings: live client for the catalogue, creation and lookup, plus the mock. Staff: mock only — SMT publishes no staff API ([contract](docs/smp-staff-contract.md)) |
 | Cloudinary image relay | WIP | WIP | Config bound, service not implemented |
 | Google OAuth | WIP | WIP | Properties bound only |
 
@@ -43,6 +44,8 @@ a place to land without conflicting on package creation.
 | `GET` | `/api/v1/reference/provinces` | public |
 | `GET` | `/api/v1/notifications` | `CUSTOMER`, `ADMIN` — own notifications only |
 | `PATCH` | `/api/v1/notifications/{id}/read`, `/api/v1/notifications/read-all` | `CUSTOMER`, `ADMIN` |
+| `GET`, `POST` | `/api/v1/admin/staff` | `ADMIN` — relayed to SMP; a create also sends the welcome email (§10.6) |
+| `GET`, `PUT` | `/api/v1/admin/staff/{staffId}` | `ADMIN` — relayed to SMP |
 | `GET` | `/ws` (+ SockJS transport paths under it) | public handshake; the JWT is checked on the STOMP CONNECT frame |
 | `GET` | `/actuator/health`, `/actuator/info` | public |
 
@@ -97,37 +100,70 @@ no secret is committed.
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | `1` | Also what `/auth/login` reports as `expiresIn` |
 | `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | **none — required** | The two regional Atlas clusters. The only variables with no default: startup fails without them; the STOMP round-trip test skips itself and the context-load test fails |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
+| `SMP_STAFF_MODE` | `mock` | Staff only, independent of `SMP_MODE`: SMT has no staff API yet, so staff stay mocked when bookings go live |
 | `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards. The same list gates the `/ws` handshake |
-| `EMAIL_MODE` | `file` | `file` = write to disk, send nothing; `smtp` = send for real. Inert on `dev`, which pins the mode — see below |
+| `EMAIL_MODE` | `file` | Leave it alone: `dev` pins `file`, and the `smtp` profile sets `smtp` — see below |
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | `no-reply@fixinh.vn` / `Fixinh` | Envelope sender of the staff welcome email |
 | `EMAIL_OUTBOX_DIR` | `target/mail` | Where `file` mode writes. Git-ignored; `mvn clean` clears it |
 | `EMAIL_STAFF_SIGN_IN_URL` | placeholder | SMP's sign-in page — staff cannot sign in to SBP |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | none | `integration` profile only. No defaults: a missing one fails startup by name |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | none | Read by the `smtp` profile (and so by `integration`, which brings it). No defaults: a missing one fails startup by name |
+| `EMAIL_RETRY_ENABLED` | `true` | The background retry of refused emails. Turn it off for a one-off real send on the shared clusters |
+| `EMAIL_RETRY_BASE_DELAY` / `EMAIL_RETRY_SWEEP_INTERVAL` | `PT2M` / `PT1M` | First wait after a refusal (it doubles after that), and how often the sweep runs. `PT20S` / `PT10S` for demos |
+| `LOGGING_FILE_NAME` | none | Spring Boot's own. `target\sbp.log` gives the acceptance script a log to search |
 | `CLOUDINARY_*`, `GOOGLE_*` | empty | Not yet used |
 
-**Email.** `dev` is pinned to `file` mode, so no message can leave the machine during
-development (Req 3.1.S5's acceptance criterion).
-
-Because `application-dev.yml` sets the mode literally, `EMAIL_MODE` cannot lift the pin — a
-profile file outranks the placeholder in `application.yml`. An OS environment variable named
-for the property itself does outrank both, so that is the escape hatch for the one real send
-needed to verify a provider end to end:
+**Email.** `dev` is pinned to `file` mode: each staff welcome email is written to `target/mail`
+as an `.eml` file and nothing leaves the machine (Req 3.1.S5's acceptance criterion). Sending
+for real is opted into by name, with the `smtp` profile, which holds the provider settings;
+`integration` brings it automatically through a profile group. A real send from a development
+machine, with a Gmail account and an app password:
 
 ```powershell
-$env:SPRING_MAIL_HOST="sandbox.smtp.mailtrap.io"; $env:SPRING_MAIL_PORT="2525"
-$env:SPRING_MAIL_USERNAME="..."; $env:SPRING_MAIL_PASSWORD="..."
-$env:FIXINH_SBP_EMAIL_MODE="smtp"; .\mvnw.cmd spring-boot:run
+$env:SPRING_PROFILES_ACTIVE = 'dev,smtp'
+$env:MAIL_HOST = 'smtp.gmail.com'; $env:MAIL_PORT = '587'
+$env:MAIL_USERNAME = 'you@gmail.com'; $env:MAIL_PASSWORD = '<16-character app password>'
+$env:EMAIL_RETRY_ENABLED = 'false'
+.\mvnw.cmd clean spring-boot:run
 ```
 
-Use a sandbox provider that captures mail rather than delivering it. No credential belongs in
-`application.yml`, and none is committed.
+Startup then reports `Email delivery: SMTP mode`. Turning the retry sweep off matters on the
+shared clusters: it sends every outstanding email row it finds, teammates' included, and a
+one-off send should send only what you trigger. Mailtrap's sandbox works the same way
+(`sandbox.smtp.mailtrap.io`, port `2525`) and captures mail instead of delivering it. The app
+password lives in that terminal only; no credential belongs in a committed file.
+
+**Mock staff.** SMT's service covers booking creation and status changes only, so staff accounts
+come from SBP's mock SMP client — `SMP_STAFF_MODE=mock`, the default even when `SMP_MODE=live`.
+What a real or stand-in SMP staff API has to provide is in
+[docs/smp-staff-contract.md](docs/smp-staff-contract.md). Two scripts drive the welcome email
+through the real endpoint; run them from `Backend` with the backend up:
+
+```powershell
+# One receptionist (south) and one technician (north); checks each letter in target/mail.
+# -Verify also reads the Notification row and Shard Directory entry back through mongosh.
+powershell -ExecutionPolicy Bypass -File .\scripts\seed-mock-staff.ps1 -Verify
+
+# Against a backend on dev,smtp: both letters land in your inbox, as plus-addresses of it.
+powershell -ExecutionPolicy Bypass -File .\scripts\seed-mock-staff.ps1 -Mailbox you@gmail.com
+
+# The issue's five acceptance criteria, PASS / FAIL / SKIP each. Start the backend with
+# LOGGING_FILE_NAME=target\sbp.log, and PT20S / PT10S retry timings for a quick run.
+powershell -ExecutionPolicy Bypass -File .\scripts\accept-staff-welcome-email.ps1 -Verify
+```
+
+Both sign in as the demo administrator from `Frontend/.env` (or `.env.example`), and every run
+uses fresh addresses. Mock staff are forgotten when the backend stops; their notifications are
+not, which is why mock staff ids are random rather than sequential. Run the acceptance script
+while no teammate's backend is up against the same clusters: every backend sweeps the same
+rows, and the retried letter can land in their outbox instead of yours.
 
 Frontend config lives in [env.js](Frontend/src/config/env.js), read from `.env` — API base URL
 (`VITE_API_URL`), the real-time channel's URL (`VITE_WS_URL`, `http://…/ws` — SockJS negotiates
 the transport from an HTTP handshake, so not `ws://`) and the login page's demo-account shortcut
 (`VITE_SHOW_DEMO_ACCOUNT`).
 
-Profiles: `dev` (single PC, SSL off, SMP mocked) and `integration` (multi-VM, SSL on, live SMP).
+Profiles: `dev` (single PC, SSL off, SMP mocked), `integration` (multi-VM, SSL on, live SMP
+bookings) and `smtp` (real email: stack it on `dev`; `integration` brings it itself).
 
 ---
 
