@@ -1,10 +1,13 @@
 package com.fixinh.sbp.modules.notification.service;
 
+import java.util.Locale;
+
 import org.springframework.stereotype.Component;
-import com.fixinh.sbp.modules.notification.model.NotificationType;
+
 import com.fixinh.sbp.common.config.SbpProperties;
 import com.fixinh.sbp.common.email.EmailMessage;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
+import com.fixinh.sbp.modules.notification.model.NotificationType;
 
 /**
  * Turns a new staff account into the message that announces it.
@@ -32,6 +35,10 @@ public class StaffWelcomeEmailComposer {
 		return new EmailMessage(command.email(), SUBJECT, body(command));
 	}
 
+	/**
+	 * The notification's stored {@code message}: who the letter was for and where it went.
+	 * Outlives delivery, so it names the recipient and never carries the password.
+	 */
 	public String summaryFor(StaffWelcomeEmailCommand command) {
 		return "Welcome email for %s (%s) to %s"
 				.formatted(command.fullName(), command.role(), command.email());
@@ -63,7 +70,7 @@ public class StaffWelcomeEmailComposer {
 				An administrator has created a Fixinh staff account for you.
 
 				  Role:      %s
-				  Sign in:   %s
+				  Email:     %s
 				  Password:  %s
 
 				Sign in at %s and change your password once you are in.
@@ -74,9 +81,21 @@ public class StaffWelcomeEmailComposer {
 				Fixinh"""
 				.formatted(
 						command.fullName(),
-						command.role(),
+						displayRole(command.role()),
 						command.email(),
 						command.initialPassword(),
 						properties.getStaffSignInUrl());
+	}
+
+	/**
+	 * The role as a person would write it. {@code TECHNICIAN} is an enum constant; "Technician"
+	 * is a job — and the reader is a new staff member, not the code that sent the letter.
+	 */
+	private static String displayRole(String role) {
+		if (role == null || role.isBlank()) {
+			return "Staff";
+		}
+		String lower = role.trim().toLowerCase(Locale.ROOT);
+		return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
 	}
 }
