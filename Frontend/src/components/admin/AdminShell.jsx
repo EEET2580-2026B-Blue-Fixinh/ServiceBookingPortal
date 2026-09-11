@@ -1,19 +1,13 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { MaterialIcon } from '../shared/icons'
 import { useAuth } from '../../context/AuthContext'
+import { getInitials } from '../../utils/format'
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/admin' },
   { key: 'customers', label: 'Customers', icon: 'group', to: '/admin/customers' },
   { key: 'staff', label: 'Staff & technicians', icon: 'engineering', to: '/admin/staff' },
 ]
-
-function getInitials(fullName) {
-  if (!fullName) return '?'
-  const [first, ...rest] = fullName.trim().split(/\s+/)
-  const last = rest.at(-1)
-  return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase()
-}
 
 const NAV_ITEM_BASE =
   'flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 font-semibold no-underline max-[900px]:whitespace-nowrap'
