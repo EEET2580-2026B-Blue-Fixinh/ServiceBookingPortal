@@ -1,5 +1,7 @@
 # Fixinh — Service Booking Portal (SBP)
 
+<!-- Test comment to verify the commit and push workflow. -->
+
 Customer-facing half of the Fixinh repair platform: customers register, sign in, and manage
 their repair bookings. The Service Management Portal (SMP) owns bookings, technicians and
 staff; SBP consumes them over REST and is currently mocked so it runs standalone.
