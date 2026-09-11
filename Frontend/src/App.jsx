@@ -1,8 +1,6 @@
 import { AppRoutes } from './pages/routes/AppRoutes'
 import { ToastStack } from './components/shared/ToastStack'
 import './App.css'
-import { useEffect } from 'react'
-import { useToast } from './context/ToastContext'
 
 // function App() {
 //   const { showToast } = useToast()
