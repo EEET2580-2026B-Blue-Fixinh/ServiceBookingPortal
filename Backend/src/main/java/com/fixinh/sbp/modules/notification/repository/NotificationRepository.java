@@ -41,8 +41,10 @@ public interface NotificationRepository {
 	 * precisely the state a human is supposed to notice. The sweeper reads the cap and marks
 	 * them.
 	 *
-	 * <p>Rows never attempted sort first, because their {@code lastAttemptAt} is null. That is
-	 * the right order: those are the ones a crash caught mid-send.
+	 * <p>Rows never attempted sort first, because their {@code lastAttemptAt} is null. Some of
+	 * those were left behind by a crash and have waited longest for any attempt, which is why
+	 * first is right. The rest are still being sent by the request that wrote them; the sweeper
+	 * leaves those alone until they are old enough to have been abandoned.
 	 *
 	 * @param limit how many to take <b>from each store</b>, so at most twice this comes back
 	 */

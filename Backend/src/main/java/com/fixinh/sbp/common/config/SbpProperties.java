@@ -174,6 +174,11 @@ public class SbpProperties {
 			 * The first wait after a failure. Each subsequent wait doubles, so the default gives
 			 * attempts at roughly 0, 2, 6, 14 and 30 minutes — long enough to ride out a provider
 			 * blip without hammering one that is genuinely down.
+			 *
+			 * <p>Also how long a row that has never been attempted is left alone, on the
+			 * assumption that the request which wrote it is still sending. Keep it well above
+			 * the SMTP timeouts, or the sweeper can resend a welcome email whose first send has
+			 * not finished.
 			 */
 			private Duration baseDelay = Duration.ofMinutes(2);
 

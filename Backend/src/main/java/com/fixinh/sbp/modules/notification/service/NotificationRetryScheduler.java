@@ -89,14 +89,27 @@ public class NotificationRetryScheduler {
 	/**
 	 * Whether enough time has passed since the last try.
 	 *
-	 * <p>A notification with no {@code lastAttemptAt} has never been attempted at all — the
-	 * process died between writing the row and calling the provider. Those are due immediately,
-	 * which is the entire reason the row is written first.
+	 * <p><b>A row with no {@code lastAttemptAt} is one of two things, and the store cannot
+	 * tell them apart.</b> Either the process died between writing the row and calling the
+	 * provider, or the request that wrote it is calling the provider right now. Resending the
+	 * first is the reason the row is written before the send. Resending the second delivers
+	 * the welcome email twice — and whichever thread saves last wins, so a stale
+	 * {@code FAILED} can overwrite this sweep's {@code SENT} and queue a third.
+	 *
+	 * <p>Age separates them. The request's own send is bounded by the SMTP timeouts under
+	 * {@code spring.mail.properties} and records its outcome long before one base delay has
+	 * passed. So a never-attempted row younger than that is left to the thread still working
+	 * on it, and one older than that was left behind by a crash and is due. That keeps the
+	 * sweeper off rows it did not write, without a lock or a claim field.
+	 *
+	 * <p>A row with no {@code createdAt} was not written by the send path, which always stamps
+	 * one, so nothing can be mid-send on it. It is due.
 	 */
 	private boolean isDue(Notification notification, Instant now) {
 		Instant lastAttempt = notification.getLastAttemptAt();
 		if (lastAttempt == null) {
-			return true;
+			Instant created = notification.getCreatedAt();
+			return created == null || !now.isBefore(created.plus(retry.getBaseDelay()));
 		}
 		return !now.isBefore(lastAttempt.plus(backoffAfter(notification.getAttemptCount())));
 	}

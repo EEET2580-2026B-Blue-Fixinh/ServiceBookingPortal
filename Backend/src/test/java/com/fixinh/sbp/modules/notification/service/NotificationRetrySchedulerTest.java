@@ -33,9 +33,9 @@ import com.fixinh.sbp.modules.notification.repository.NotificationRepository;
 /**
  * The sweeper, with the clock supplied by the fixtures rather than mocked.
  *
- * <p>Each notification is built with a {@code lastAttemptAt} far enough in the past — or not —
- * to put it either side of its backoff window, so "is this due yet" is exercised against real
- * arithmetic instead of a frozen clock.
+ * <p>Each notification is built with a {@code lastAttemptAt} — or, for a row never attempted,
+ * a {@code createdAt} — far enough in the past, or not, to put it either side of its window.
+ * "Is this due yet" is then exercised against real arithmetic instead of a frozen clock.
  */
 class NotificationRetrySchedulerTest {
 
@@ -50,14 +50,17 @@ class NotificationRetrySchedulerTest {
 	void setUp() {
 		repository = mock(NotificationRepository.class);
 		emailClient = mock(EmailClient.class);
+		scheduler = schedulerWithBaseDelay(BASE);
+	}
 
+	private NotificationRetryScheduler schedulerWithBaseDelay(Duration baseDelay) {
 		SbpProperties properties = new SbpProperties();
 		properties.getEmail().setStaffSignInUrl("https://smp.fixinh.vn/login");
-		properties.getEmail().getRetry().setBaseDelay(BASE);
+		properties.getEmail().getRetry().setBaseDelay(baseDelay);
 		properties.getEmail().getRetry().setMaxAttempts(MAX_ATTEMPTS);
 		properties.getEmail().getRetry().setBatchSize(50);
 
-		scheduler = new NotificationRetryScheduler(repository,
+		return new NotificationRetryScheduler(repository,
 				new StaffWelcomeEmailComposer(properties), emailClient, properties);
 	}
 
@@ -79,6 +82,18 @@ class NotificationRetrySchedulerTest {
 				.build();
 	}
 
+	/**
+	 * A row exactly as the send path leaves it before calling the provider: {@code PENDING}, no
+	 * attempts, no {@code lastAttemptAt}, written {@code secondsAgo} seconds ago.
+	 */
+	private Notification neverAttempted(long secondsAgo) {
+		Notification notification = failed(0, 0);
+		notification.setDeliveryStatus(DeliveryStatus.PENDING);
+		notification.setLastAttemptAt(null);
+		notification.setCreatedAt(Instant.now().minusSeconds(secondsAgo));
+		return notification;
+	}
+
 	@Test
 	void resendsOnceTheBackoffHasElapsed() {
 		// One attempt made, so the wait is the 2-minute base. Three minutes have passed.
@@ -95,7 +110,7 @@ class NotificationRetrySchedulerTest {
 	}
 
 	@Test
-	void leavesAlonePrizesStillInsideTheirBackoffWindow() {
+	void leavesAloneRowsStillInsideTheirBackoffWindow() {
 		// Two attempts made, so the wait has doubled to 4 minutes. Only one has passed.
 		Notification notYet = failed(2, 1);
 		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(notYet));
@@ -170,21 +185,69 @@ class NotificationRetrySchedulerTest {
 		verify(repository).save(exhausted);
 	}
 
+	// --- Never attempted: a crash, or a first send still in flight -------------------------
+
 	@Test
-	void sendsImmediatelyForARowThatWasNeverAttempted() {
-		// A crash between the first save and the provider call leaves PENDING with no
-		// lastAttemptAt. Writing the row first is only worth doing if this case works.
-		Notification neverTried = failed(0, 0);
-		neverTried.setDeliveryStatus(DeliveryStatus.PENDING);
-		neverTried.setLastAttemptAt(null);
-		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(neverTried));
+	void leavesAFreshRowToTheRequestStillSendingIt() {
+		// Written ten seconds ago and never attempted: the administrator's request is still
+		// waiting on the provider. Sending here is what used to deliver the email twice.
+		Notification inFlight = neverAttempted(10);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(inFlight));
+
+		scheduler.retryOutstandingEmails();
+
+		verify(emailClient, never()).send(any(EmailMessage.class));
+		verify(repository, never()).save(any());
+		assertEquals(DeliveryStatus.PENDING, inFlight.getDeliveryStatus());
+		assertEquals(0, inFlight.getAttemptCount(), "the sweeper must not claim the attempt");
+	}
+
+	@Test
+	void picksUpARowACrashLeftBehindOnceTheGraceHasPassed() {
+		// Three minutes old, past the two-minute base delay, and still never attempted. No
+		// request runs that long -- the SMTP timeouts end it well before -- so the process
+		// died between writing the row and calling the provider. Writing the row first is only
+		// worth doing if this case still gets sent.
+		Notification orphaned = neverAttempted(180);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(orphaned));
 
 		scheduler.retryOutstandingEmails();
 
 		verify(emailClient).send(any(EmailMessage.class));
-		assertEquals(DeliveryStatus.SENT, neverTried.getDeliveryStatus());
-		assertEquals(1, neverTried.getAttemptCount());
+		assertEquals(DeliveryStatus.SENT, orphaned.getDeliveryStatus());
+		assertEquals(1, orphaned.getAttemptCount(), "the first attempt, made by the sweeper");
+		verify(repository).save(orphaned);
 	}
+
+	@Test
+	void theGraceFollowsTheConfiguredBaseDelay() {
+		// The same three-minute-old row as above, but with a five-minute base delay it could
+		// still be in flight. The grace is configuration, not a constant hidden in the sweeper.
+		NotificationRetryScheduler patient = schedulerWithBaseDelay(Duration.ofMinutes(5));
+		Notification stillYoung = neverAttempted(180);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(stillYoung));
+
+		patient.retryOutstandingEmails();
+
+		verify(emailClient, never()).send(any(EmailMessage.class));
+		assertEquals(DeliveryStatus.PENDING, stillYoung.getDeliveryStatus());
+	}
+
+	@Test
+	void treatsANeverAttemptedRowWithNoCreationTimeAsDue() {
+		// The send path always stamps createdAt, so a row without one was not written by a
+		// request that could still be sending it.
+		Notification undated = neverAttempted(0);
+		undated.setCreatedAt(null);
+		when(repository.findOutstandingEmails(anyInt())).thenReturn(List.of(undated));
+
+		scheduler.retryOutstandingEmails();
+
+		verify(emailClient).send(any(EmailMessage.class));
+		assertEquals(DeliveryStatus.SENT, undated.getDeliveryStatus());
+	}
+
+	// --- Nothing to send -----------------------------------------------------------------
 
 	@Test
 	void abandonsARowWithNothingLeftToSendRatherThanLoopingOnIt() {

@@ -20,6 +20,26 @@ spring:
       max-file-size: ${MULTIPART_MAX_FILE_SIZE:8MB}
       max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:26MB}
 
+  mail:
+    # Req 3.1.S5: socket timeouts for the welcome email's SMTP transport, in ms.
+    #
+    # Here rather than in application-integration.yml because they are not secrets
+    # and every path that can send needs them -- including the one-off SMTP
+    # override on dev that the README describes. Jakarta Mail waits forever by
+    # default, so without these one unresponsive provider pins an administrator's
+    # create-staff request, and the retry sweeper's thread, until a restart.
+    #
+    # They also bound how long a first send can take, which the retry sweeper's
+    # grace for never-attempted rows (fixinh.sbp.email.retry.base-delay) relies on.
+    #
+    # Inert until spring.mail.host is set: with no host Spring Boot creates no mail
+    # sender and nothing reads these. The integration profile adds auth and TLS to
+    # this same map, and Spring Boot merges the two.
+    properties:
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
+
 server:
   port: ${SERVER_PORT:8443}
   ssl:
@@ -79,10 +99,11 @@ fixinh:
       # Req 3.1.S5, API Doc §10.6: the welcome email sent when an administrator
       # creates a receptionist or technician.
       #
-      # This block is policy. The SMTP transport lives under spring.mail.* and is
-      # set only by application-integration.yml -- there is deliberately no
+      # This block is policy. The SMTP host and credential live under spring.mail.*
+      # and are set only by application-integration.yml -- there is deliberately no
       # spring.mail.host here, because a default of localhost would let a
       # misconfigured environment appear to send while dropping every message.
+      # The socket timeouts are the one exception; see spring.mail above.
       #
       # mode: file -> EmailClient writes the message to outbox-directory and
       #               nothing leaves the machine. The default everywhere, so
@@ -114,6 +135,9 @@ fixinh:
         # marked ABANDONED rather than retried forever.
         max-attempts: ${EMAIL_RETRY_MAX_ATTEMPTS:5}
         # Doubles each time: with 2 minutes, attempts land at about 0, 2, 6, 14 and 30.
+        # Also the grace a never-attempted row gets before the sweeper assumes the
+        # request that wrote it has died -- keep it well above the SMTP timeouts
+        # under spring.mail, or a slow first send can be sent a second time.
         base-delay: ${EMAIL_RETRY_BASE_DELAY:PT2M}
         batch-size: ${EMAIL_RETRY_BATCH_SIZE:50}
 

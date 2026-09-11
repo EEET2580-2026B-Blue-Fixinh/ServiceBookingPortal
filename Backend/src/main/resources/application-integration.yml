@@ -15,6 +15,10 @@ fixinh:
 # startup with the name of the variable, which is the right outcome: the
 # alternative is booting happily and discovering weeks later that no staff
 # member ever received a welcome email.
+#
+# The socket timeouts are not here. They are not secrets, and every path that
+# can send needs them, so they live in application.yml; Spring Boot merges that
+# spring.mail.properties map with the one below.
 spring:
   mail:
     host: ${MAIL_HOST}
@@ -24,11 +28,6 @@ spring:
     properties:
       "[mail.smtp.auth]": true
       "[mail.smtp.starttls.enable]": true
-      # Boot leaves these infinite. One unresponsive provider would otherwise pin
-      # the retry scheduler's thread until the process is restarted.
-      "[mail.smtp.connectiontimeout]": 5000
-      "[mail.smtp.timeout]": 5000
-      "[mail.smtp.writetimeout]": 5000
 
 server:
   ssl:
