@@ -3,6 +3,12 @@ spring:
     name: sbp
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+    # Req 3.1.S5: integration always sends real email, so it brings the smtp
+    # profile, which holds the provider settings. A group rather than a copy, so
+    # the transport is written down in exactly one file. On a development machine,
+    # opt in explicitly instead: SPRING_PROFILES_ACTIVE=dev,smtp.
+    group:
+      integration: smtp
   data:
     mongodb:
       # Disable auto-index creation when using MongoDB Atlas with existing indexes
@@ -23,9 +29,9 @@ spring:
   mail:
     # Req 3.1.S5: socket timeouts for the welcome email's SMTP transport, in ms.
     #
-    # Here rather than in application-integration.yml because they are not secrets
-    # and every path that can send needs them -- including the one-off SMTP
-    # override on dev that the README describes. Jakarta Mail waits forever by
+    # Here rather than in application-smtp.yml because they are not secrets and
+    # belong to every run that can send, whichever profiles brought it the
+    # transport. Jakarta Mail waits forever by
     # default, so without these one unresponsive provider pins an administrator's
     # create-staff request, and the retry sweeper's thread, until a restart.
     #
@@ -33,7 +39,7 @@ spring:
     # grace for never-attempted rows (fixinh.sbp.email.retry.base-delay) relies on.
     #
     # Inert until spring.mail.host is set: with no host Spring Boot creates no mail
-    # sender and nothing reads these. The integration profile adds auth and TLS to
+    # sender and nothing reads these. The smtp profile adds auth and STARTTLS to
     # this same map, and Spring Boot merges the two.
     properties:
       "[mail.smtp.connectiontimeout]": 5000
@@ -106,7 +112,7 @@ fixinh:
       # creates a receptionist or technician.
       #
       # This block is policy. The SMTP host and credential live under spring.mail.*
-      # and are set only by application-integration.yml -- there is deliberately no
+      # and are set only by application-smtp.yml -- there is deliberately no
       # spring.mail.host here, because a default of localhost would let a
       # misconfigured environment appear to send while dropping every message.
       # The socket timeouts are the one exception; see spring.mail above.
@@ -114,7 +120,8 @@ fixinh:
       # mode: file -> EmailClient writes the message to outbox-directory and
       #               nothing leaves the machine. The default everywhere, so
       #               sending is opted into rather than fallen into.
-      #       smtp -> EmailClient sends through spring.mail.*.
+      #       smtp -> EmailClient sends through spring.mail.*. Set by the smtp
+      #               profile, not by hand: that profile also brings the transport.
       mode: ${EMAIL_MODE:file}
       from-address: ${EMAIL_FROM_ADDRESS:no-reply@fixinh.vn}
       from-name: ${EMAIL_FROM_NAME:Fixinh}

@@ -2,6 +2,7 @@ package com.fixinh.sbp.common.email;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -20,13 +21,18 @@ import org.springframework.core.io.ClassPathResource;
  * The SMTP transport settings as each profile actually resolves them — read from the real
  * YAML files with Spring Boot's own loader and binder, with no context started.
  *
- * <p>Guards two things an edit to those files could break without any other test noticing.
- * The socket timeouts live in {@code application.yml} and must reach every profile, including
- * {@code integration}, whose own {@code spring.mail.properties} map would hide them if the two
- * maps replaced each other instead of merging. And nothing a {@code dev} run reads may set
- * {@code spring.mail.host}: with no host Spring Boot creates no mail sender, which is half of
- * what keeps development away from real inboxes (Req 3.1.S5). The other half is the
- * {@code file} mode pin in {@code application-dev.yml}.
+ * <p>Guards what an edit to those files could break without any other test noticing:
+ * <ul>
+ *   <li>the socket timeouts in {@code application.yml} reach the {@code smtp} profile, whose own
+ *       {@code spring.mail.properties} map would hide them if the two replaced each other
+ *       instead of merging;</li>
+ *   <li>{@code integration} brings {@code smtp} with it, so the transport is written down
+ *       once;</li>
+ *   <li>{@code dev,smtp} really does send, because the later profile lifts dev's file pin;</li>
+ *   <li>and {@code dev} alone sets no {@code spring.mail.host}. With no host Spring Boot creates
+ *       no mail sender, which is half of what keeps development away from real inboxes
+ *       (Req 3.1.S5); the other half is the {@code file} pin in {@code application-dev.yml}.</li>
+ * </ul>
  */
 class MailTransportPropertiesTest {
 
@@ -43,9 +49,9 @@ class MailTransportPropertiesTest {
 	}
 
 	@Test
-	void theIntegrationProfileKeepsItsTransportSettingsAndGainsTheTimeouts() throws IOException {
+	void theSmtpProfileKeepsItsTransportSettingsAndGainsTheTimeouts() throws IOException {
 		Map<String, String> properties =
-				mailProperties("application-integration.yml", "application.yml");
+				mailProperties("application-smtp.yml", "application.yml");
 
 		assertEquals("true", properties.get("mail.smtp.auth"));
 		assertEquals("true", properties.get("mail.smtp.starttls.enable"));
@@ -53,6 +59,27 @@ class MailTransportPropertiesTest {
 				"lost if the profile's map replaced the base one instead of merging with it");
 		assertEquals("5000", properties.get("mail.smtp.timeout"));
 		assertEquals("5000", properties.get("mail.smtp.writetimeout"));
+	}
+
+	@Test
+	void theIntegrationProfileBringsTheSmtpProfileInsteadOfACopy() throws IOException {
+		List<String> group = binderFor("application.yml")
+				.bind("spring.profiles.group.integration", Bindable.listOf(String.class))
+				.orElse(List.of());
+
+		assertTrue(group.contains("smtp"), "integration must send real email");
+		assertFalse(binderFor("application-integration.yml")
+						.bind("spring.mail.host", String.class).isBound(),
+				"the transport belongs in application-smtp.yml alone, not in a second copy");
+	}
+
+	@Test
+	void stackingSmtpOnDevLiftsTheFilePin() throws IOException {
+		// SPRING_PROFILES_ACTIVE=dev,smtp: the later profile outranks the earlier one.
+		String mode = binderFor("application-smtp.yml", "application-dev.yml", "application.yml")
+				.bind("fixinh.sbp.email.mode", String.class).get();
+
+		assertEquals("smtp", mode);
 	}
 
 	@Test

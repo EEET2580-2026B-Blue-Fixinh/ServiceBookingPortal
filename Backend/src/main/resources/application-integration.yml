@@ -6,30 +6,10 @@ fixinh:
       mode: live
       # Bookings only. Staff keep smp.staff-mode from application.yml, which stays
       # mock until SMT publishes a staff API.
-    email:
-      # The only profile that sends for real (Req 3.1.S5).
-      mode: smtp
 
-# Provider transport. Bound by Spring Boot's own MailProperties, which is why it
-# sits under spring.mail rather than fixinh.sbp.
-#
-# None of these have a default. A missing variable fails the application at
-# startup with the name of the variable, which is the right outcome: the
-# alternative is booting happily and discovering weeks later that no staff
-# member ever received a welcome email.
-#
-# The socket timeouts are not here. They are not secrets, and every path that
-# can send needs them, so they live in application.yml; Spring Boot merges that
-# spring.mail.properties map with the one below.
-spring:
-  mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT}
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-    properties:
-      "[mail.smtp.auth]": true
-      "[mail.smtp.starttls.enable]": true
+# Email is sent for real here (Req 3.1.S5), but the provider settings are not in
+# this file: the group in application.yml activates the smtp profile alongside
+# this one, so application-smtp.yml is the single place they are written down.
 
 server:
   ssl:

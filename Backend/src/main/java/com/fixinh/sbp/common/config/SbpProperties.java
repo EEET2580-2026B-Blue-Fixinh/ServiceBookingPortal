@@ -127,7 +127,7 @@ public class SbpProperties {
 	 * Req 3.1.S5, API Doc §10.6: the welcome email a new staff member receives.
 	 *
 	 * <p><b>Policy only.</b> The SMTP transport — host, port, credential, TLS — is Spring
-	 * Boot's own {@code spring.mail.*} namespace and is set by the {@code integration}
+	 * Boot's own {@code spring.mail.*} namespace and is set by the {@code smtp}
 	 * profile alone. Splitting the two keeps the provider credential out of the file
 	 * everyone reads, and leaves Boot's autoconfiguration owning what it already owns.
 	 */
