@@ -21,6 +21,7 @@ export function useActivateCustomer(onToggled) {
       const updated = await setCustomerStatus(customer.customerId, nextStatus)
       onToggled(updated)
       setConfirmTarget(null)
+      setError('')
     } catch (err) {
       setError(err.message)
     } finally {

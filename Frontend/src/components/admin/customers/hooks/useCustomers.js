@@ -9,7 +9,9 @@ const NAME_SORTS = {
   'Name (Z–A)': (a, b) => b.fullName.localeCompare(a.fullName),
   'Status (Active first)': (a, b) =>
     a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? -1 : 1,
-  'Status (Inactive first)': (a, b) =>
+  // Matches the "Deactivated" wording on CustomerCard's status pill, not the
+  // raw "INACTIVE"-sounding accountStatus value.
+  'Status (Deactivated first)': (a, b) =>
     a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? 1 : -1,
 }
 
@@ -30,7 +32,10 @@ export function useCustomers() {
 
   useEffect(() => {
     fetchCustomers()
-      .then(setCustomers)
+      .then((data) => {
+        setCustomers(data)
+        setError('')
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
 
