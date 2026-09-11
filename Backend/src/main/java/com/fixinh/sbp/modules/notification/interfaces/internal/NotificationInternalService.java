@@ -1,9 +1,9 @@
 package com.fixinh.sbp.modules.notification.interfaces.internal;
 
-import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
-import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
 import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
+import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
+import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
 
 /**
  * What other modules may ask of the notification module.
@@ -11,7 +11,7 @@ import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateComman
 public interface NotificationInternalService {
 
 	/**
-	 * Sends the welcome email and records the attempt 
+	 * Sends the welcome email of Req 3.1.S5 and records the attempt.
 	 *
 	 * <p><b>Does not throw when the provider refuses.</b> A failed send comes back as
 	 * {@link StaffWelcomeEmailResult#sent()} being false, with the attempt recorded for the
@@ -25,9 +25,8 @@ public interface NotificationInternalService {
 	 */
 	StaffWelcomeEmailResult sendStaffWelcomeEmail(StaffWelcomeEmailCommand command);
 
-
 	/**
-	 * Records a notification and returns it
+	 * Records an in-app notification and returns it.
 	 *
 	 * @throws IllegalArgumentException if the command is incomplete
 	 * @throws IllegalStateException if the recipient is a customer with no profile, so there is

@@ -45,7 +45,9 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 	private final EmailClient emailClient;
 
 	/**
-	 * <b>Write, then send, then write again.</b>
+	 * <b>Write, then send, then write again.</b> The first write lands before the provider is
+	 * called, so a crash mid-send still leaves the retry sweeper a row to find; the second
+	 * records how the attempt went. The row, not the provider's answer, is the record.
 	 */
 	@Override
 	public StaffWelcomeEmailResult sendStaffWelcomeEmail(StaffWelcomeEmailCommand command) {
@@ -82,9 +84,9 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 		return new StaffWelcomeEmailResult(recorded.getId(), sent);
 	}
 
-		// --- Raising one, for Integration and Admin -------------------------------
+	// --- Raising an in-app one, for other modules -----------------------------
 
-		@Override
+	@Override
 	public NotificationDto raise(NotificationCreateCommand command) {
 		Region region = storeFor(command);
 		Instant now = Instant.now();

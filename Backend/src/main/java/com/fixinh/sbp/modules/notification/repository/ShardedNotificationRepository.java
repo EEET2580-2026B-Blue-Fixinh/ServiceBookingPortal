@@ -128,7 +128,7 @@ public class ShardedNotificationRepository implements NotificationRepository {
 
 		requireRecipient(region, recipientType, recipientIdentifier);
 
-				Query query = recipientQuery(recipientType, recipientIdentifier, unreadOnly)
+		Query query = recipientQuery(recipientType, recipientIdentifier, unreadOnly)
 				// createdAt alone is not a total order: BSON keeps an Instant to the
 				// millisecond, so tied documents could drift between pages under offset
 				// paging and a reader would see one twice or miss it. _id is unique, and
@@ -208,7 +208,9 @@ public class ShardedNotificationRepository implements NotificationRepository {
 	}
 
 	/**
-	 * <b>Refuses rather than defaults.
+	 * <b>Refuses rather than defaults.</b> Falling through to a default store would answer
+	 * with an empty list, which reads exactly like a recipient with no notifications — a
+	 * silent wrong answer, where an exception is at least a loud one.
 	 */
 	private void requireRecipient(Region region, RecipientType recipientType,
 			String recipientIdentifier) {

@@ -3,7 +3,7 @@
 	Test-run logging. Applies to `mvn test` only: this file is on the test classpath and
 	nowhere else, so nothing here changes how the application logs when it runs.
 
-	Why it exists: five of the six test classes are plain JUnit and never start Spring, so
+	Why it exists: most test classes are plain JUnit and never start Spring, so
 	`logging.level.*` in application-dev.yml never reaches them. Without a config of its own
 	Logback falls back to DEBUG-to-console, and the tests that deliberately provoke a failure
 	(a refused email, an exhausted retry, an unwritable shard directory) each print a full
@@ -26,21 +26,14 @@
 
 	<!--
 		Spring Boot re-applies logging.level.* from application-dev.yml after this file is
-		read, so the line above is overridden back to DEBUG inside SbpApplicationTests, the
-		one test that starts a context. The two below are not named there, so they hold
-		everywhere.
+		read, so the line above is overridden back to DEBUG inside the tests that start a full
+		context. The two below are not named there, so they hold everywhere.
+
+		WelcomeEmailLoggingTest turns com.fixinh.sbp back on for itself and attaches its own
+		appender: proving that a password is never logged needs logging switched on.
 	-->
 	<logger name="org.springframework" level="WARN"/>
 	<logger name="org.mongodb" level="WARN"/>
-
-	<!--
-		Uncomment to also silence the ShardIndexInitializer warning that SbpApplicationTests
-		prints on every run. It reports a real pre-existing bug: ensureCustomerIndexes builds
-		a unique index on Customer.phoneNumber, a field that moved to UserCredential. Left
-		visible on purpose until whoever owns the customer module has seen it.
-
-		<logger name="com.fixinh.sbp.common.sharding.ShardIndexInitializer" level="ERROR"/>
-	-->
 
 	<root level="WARN">
 		<appender-ref ref="CONSOLE"/>

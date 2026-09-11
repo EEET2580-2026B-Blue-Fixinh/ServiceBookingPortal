@@ -13,6 +13,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * One notification, in-app or email, stored in its recipient's regional store (CDM:
+ * Notification).
+ *
+ * <p>One document, two lifecycles. An {@code IN_APP} row is delivered by being written, and
+ * afterwards only its {@code readStatus} changes. An {@code EMAIL} row — the staff welcome
+ * email of Req 3.1.S5 — moves through {@link DeliveryStatus} as the provider accepts or
+ * refuses it, which is what {@code attemptCount}, {@code lastAttemptAt} and
+ * {@code undeliveredBody} are for.
+ */
 @Document(collection = "notifications")
 @Getter
 @Setter
@@ -88,7 +98,7 @@ public class Notification {
 	 * instead of being permanent.
 	 *
 	 * <p>This is the field that would disappear entirely if SMT agrees to return a single-use
-	 * activation link instead of a password 
+	 * activation link instead of a password.
 	 */
 	private String undeliveredBody;
 

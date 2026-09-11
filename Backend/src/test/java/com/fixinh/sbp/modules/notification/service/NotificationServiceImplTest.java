@@ -203,13 +203,10 @@ class NotificationServiceImplTest {
 				"STF-002", "Someone", "someone@fixinh.vn", "RECEPTIONIST", PASSWORD, "ATLANTIS");
 		when(shardDirectory.findRegion(SubjectType.STAFF, "STF-002")).thenReturn(Optional.empty());
 
-		try {
-			service.sendStaffWelcomeEmail(nowhere);
-		}
-		catch (RuntimeException expected) {
-			// 400 PROVINCE_CODE_INVALID from the region resolver.
-		}
+		ApiException thrown = assertThrows(ApiException.class,
+				() -> service.sendStaffWelcomeEmail(nowhere));
 
+		assertSame(ErrorCode.PROVINCE_CODE_INVALID, thrown.getErrorCode());
 		assertTrue(saves.isEmpty(), "nothing filed in a store we could not identify");
 		verify(emailClient, never()).send(any(EmailMessage.class));
 	}

@@ -16,7 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Decides which store a notification belongs in (Region type)
+ * Decides which regional store a notification is filed in, and remembers the answer in the
+ * Shard Directory so the next notification to the same recipient needs no province.
  */
 @Component
 @RequiredArgsConstructor
@@ -73,7 +74,7 @@ public class NotificationRegionResolver {
 				regionResolver.resolve(provinceCode));
 	}
 
-		/**
+	/**
 	 * The store holding a customer's notifications — read or written (§9.1, §9.2, Req 3.3.U2).
 	 *
 	 * @throws IllegalStateException when no profile exists for this id. A caller reaching here

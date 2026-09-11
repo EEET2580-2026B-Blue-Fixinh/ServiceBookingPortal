@@ -112,10 +112,23 @@ public class ShardIndexInitializer {
         }
     }
 
+    /**
+     * The administrators' email index, created only when no index already covers that field.
+     *
+     * <p>Matched on fields, never on name, for the reason {@link #ensureCustomerIndexes} gives.
+     * {@code Administrator#email} carries {@code @Indexed}, which names its index {@code email};
+     * {@code Index().on(EMAIL)} asks for {@code email_1} over the same field, and Mongo refuses a
+     * second index on one field whatever it is called. That refusal — error 85,
+     * {@code IndexOptionsConflict} — was the warning and stack trace printed on every startup.
+     */
     private void ensureAdministratorIndexes(MongoTemplate template) {
         try {
-            template.indexOps(Administrator.class)
-                    .createIndex(new Index().on(EMAIL, Sort.Direction.ASC));
+            IndexOperations indexes = template.indexOps(Administrator.class);
+            boolean alreadyCovered = indexes.getIndexInfo().stream()
+                    .anyMatch(existing -> coversExactly(existing, List.of(EMAIL)));
+            if (!alreadyCovered) {
+                indexes.createIndex(new Index().on(EMAIL, Sort.Direction.ASC));
+            }
         }
         catch (RuntimeException ex) {
             log.warn("Could not ensure administrator indexes", ex);

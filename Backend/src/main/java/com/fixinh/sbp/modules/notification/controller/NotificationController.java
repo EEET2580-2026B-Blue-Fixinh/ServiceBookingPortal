@@ -69,10 +69,10 @@ public class NotificationController {
 	}
 
 	/**
-	 * Marks every unread notification for the caller read — the endpoint
-	 * behind the "Mark all as read" control. Even when there was nothing to mark. Having an 
-     * empty bell is not a failed request, and a control that errored on a second press
-     * would be worse than one that quietly did nothing.
+	 * Marks every unread notification for the caller read — the endpoint behind the "Mark
+	 * all as read" control (§9.2). Succeeds even when there was nothing to mark: an empty
+	 * bell is not a failed request, and a control that errored on a second press would be
+	 * worse than one that quietly did nothing.
 	 */
 	@PatchMapping("/read-all")
 	public ResponseEntity<Void> markAllRead(@AuthenticationPrincipal UserPrincipal principal) {
