@@ -1,5 +1,4 @@
 import { AdminShell } from '../../components/admin/AdminShell'
-import { CustomerSearch } from '../../components/admin/customers/ui/CustomerSearch'
 import { CustomerList } from '../../components/admin/customers/ui/CustomerList'
 import { ActivateConfirmModal } from '../../components/admin/customers/ui/ActivateConfirmModal'
 import { useCustomers } from '../../components/admin/customers/hooks/useCustomers'
@@ -19,13 +18,6 @@ export function AdminCustomersPage() {
         </p>
       )}
 
-      <CustomerSearch
-        value={customers.search}
-        onChange={customers.setSearch}
-        matchCount={customers.matchCount}
-        totalCount={customers.total}
-      />
-
       <CustomerList
         customers={customers.customers}
         total={customers.total}
@@ -39,6 +31,11 @@ export function AdminCustomersPage() {
         page={customers.page}
         pageSize={customers.pageSize}
         onPageChange={customers.setPage}
+        search={customers.search}
+        onSearchChange={customers.setSearch}
+        sortBy={customers.sortBy}
+        sortOptions={customers.sortOptions}
+        onSortChange={customers.setSortBy}
       />
 
       <ActivateConfirmModal

@@ -4,6 +4,28 @@ import { fetchStaff } from '../services/adminStaffEndpoints'
 const SEARCH_DEBOUNCE_MS = 300
 const PAGE_SIZE = 5
 
+const STAFF_SORTS = {
+  'Name (A–Z)': (a, b) => a.fullName.localeCompare(b.fullName),
+  'Name (Z–A)': (a, b) => b.fullName.localeCompare(a.fullName),
+  'Status (Active first)': (a, b) =>
+    a.employmentStatus === b.employmentStatus
+      ? a.fullName.localeCompare(b.fullName)
+      : a.employmentStatus === 'ACTIVE'
+        ? -1
+        : 1,
+  'Status (Inactive first)': (a, b) =>
+    a.employmentStatus === b.employmentStatus
+      ? a.fullName.localeCompare(b.fullName)
+      : a.employmentStatus === 'ACTIVE'
+        ? 1
+        : -1,
+  'Role (A–Z)': (a, b) => a.staffRole.localeCompare(b.staffRole) || a.fullName.localeCompare(b.fullName),
+  'Branch (A–Z)': (a, b) =>
+    (a.branchProvinceName ?? '').localeCompare(b.branchProvinceName ?? '') || a.fullName.localeCompare(b.fullName),
+}
+
+export const STAFF_SORT_OPTIONS = Object.keys(STAFF_SORTS)
+
 /**
  * Loads the staff/technician list and delegates search to the backend/mocked
  * SMT (Req 3.5.M2) instead of filtering an already-fetched list here. `notice`
@@ -22,6 +44,7 @@ export function useStaff() {
   const [notice, setNotice] = useState(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sortBy, setSortBy] = useState(STAFF_SORT_OPTIONS[0])
 
   // Discards a search response that resolves after a newer one was already
   // requested, so fast typing can't let a stale result overwrite a fresh one.
@@ -61,15 +84,21 @@ export function useStaff() {
   // The list the table is paging through: the search response when searching,
   // otherwise the full roster.
   const visibleStaff = search.trim() ? (searchResults ?? allStaff) : allStaff
+  const sortedStaff = [...visibleStaff].sort(STAFF_SORTS[sortBy])
 
-  const pageCount = Math.max(1, Math.ceil(visibleStaff.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(sortedStaff.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
-  const pageStaff = visibleStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageStaff = sortedStaff.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   // A new search makes the current page number meaningless, so it sends the
   // reader back to the first page.
   const changeSearch = (value) => {
     setSearch(value)
+    setPage(1)
+  }
+
+  const changeSort = (value) => {
+    setSortBy(value)
     setPage(1)
   }
 
@@ -87,6 +116,9 @@ export function useStaff() {
     setNotice,
     search,
     setSearch: changeSearch,
+    sortBy,
+    setSortBy: changeSort,
+    sortOptions: STAFF_SORT_OPTIONS,
     technicianCount,
     receptionistCount: allStaff.length - technicianCount,
     reload,

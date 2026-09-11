@@ -1,6 +1,5 @@
 import { AdminShell } from '../../components/admin/AdminShell'
 import { StaffForm } from '../../components/admin/staff/ui/StaffForm'
-import { StaffSearch } from '../../components/admin/staff/ui/StaffSearch'
 import { StaffList } from '../../components/admin/staff/ui/StaffList'
 import { MaterialIcon } from '../../components/shared/icons'
 import { useStaff } from '../../components/admin/staff/hooks/useStaff'
@@ -49,14 +48,6 @@ export function AdminStaffPage() {
         </p>
       )}
 
-      <StaffSearch
-        value={staff.search}
-        onChange={staff.setSearch}
-        matchCount={staff.matchCount}
-        totalCount={staff.total}
-        searching={staff.searching}
-      />
-
       <StaffList
         staff={staff.staff}
         total={staff.total}
@@ -69,6 +60,12 @@ export function AdminStaffPage() {
         page={staff.page}
         pageSize={staff.pageSize}
         onPageChange={staff.setPage}
+        search={staff.search}
+        onSearchChange={staff.setSearch}
+        searching={staff.searching}
+        sortBy={staff.sortBy}
+        sortOptions={staff.sortOptions}
+        onSortChange={staff.setSortBy}
       />
 
       <StaffForm

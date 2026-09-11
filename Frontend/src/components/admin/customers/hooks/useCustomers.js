@@ -4,6 +4,17 @@ import { fetchProvinces } from '../../../../services/api/endpoints/referenceEndp
 
 const PAGE_SIZE = 5
 
+const NAME_SORTS = {
+  'Name (A–Z)': (a, b) => a.fullName.localeCompare(b.fullName),
+  'Name (Z–A)': (a, b) => b.fullName.localeCompare(a.fullName),
+  'Status (Active first)': (a, b) =>
+    a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? -1 : 1,
+  'Status (Inactive first)': (a, b) =>
+    a.accountStatus === b.accountStatus ? a.fullName.localeCompare(b.fullName) : a.accountStatus === 'ACTIVE' ? 1 : -1,
+}
+
+export const CUSTOMER_SORT_OPTIONS = [...Object.keys(NAME_SORTS), 'City (A–Z)']
+
 /**
  * Loads the customer list and province names, and exposes the search-filtered
  * view AdminCustomersPage renders (Req 3.5.S2).
@@ -15,6 +26,7 @@ export function useCustomers() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [sortBy, setSortBy] = useState(CUSTOMER_SORT_OPTIONS[0])
 
   useEffect(() => {
     fetchCustomers()
@@ -39,14 +51,30 @@ export function useCustomers() {
     )
   }, [customers, search])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const cityOf = (customer) => provinceNames[customer.address?.provinceCode] ?? customer.address?.provinceCode ?? ''
+
+  const sorted = useMemo(() => {
+    const comparator =
+      sortBy === 'City (A–Z)'
+        ? (a, b) => cityOf(a).localeCompare(cityOf(b)) || a.fullName.localeCompare(b.fullName)
+        : NAME_SORTS[sortBy]
+    return [...filtered].sort(comparator)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sortBy, provinceNames])
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
-  const pageCustomers = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pageCustomers = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   // A new search makes the current page number meaningless, so it sends the
   // reader back to the first page.
   const changeSearch = (value) => {
     setSearch(value)
+    setPage(1)
+  }
+
+  const changeSort = (value) => {
+    setSortBy(value)
     setPage(1)
   }
 
@@ -69,6 +97,9 @@ export function useCustomers() {
     error,
     search,
     setSearch: changeSearch,
+    sortBy,
+    setSortBy: changeSort,
+    sortOptions: CUSTOMER_SORT_OPTIONS,
     provinceNames,
     activeCount,
     deactivatedCount: customers.length - activeCount,
