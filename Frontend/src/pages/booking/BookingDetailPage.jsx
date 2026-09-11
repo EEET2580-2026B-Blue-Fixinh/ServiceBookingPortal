@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { BookingShell } from "../../components/booking/BookingShell";
 import { StatusBadge } from "../../components/booking/StatusBadge";
 import { CancelBookingDialog } from "../../components/booking/CancelBookingDialog";
@@ -107,6 +107,13 @@ export function BookingDetailPage() {
   const [error, setError] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
 
+  // `location.key` changes on every navigation, including one to the URL already
+  // open. That is the case this reads: a customer sitting on this booking taps the
+  // toast for it, React Router keeps the mounted page because the path has not
+  // changed, and without this the screen would still show the state from before
+  // the event that produced the notification.
+  const location = useLocation();
+
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelPending, setCancelPending] = useState(false);
   const [cancelError, setCancelError] = useState(null);
@@ -129,7 +136,7 @@ export function BookingDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [bookingRef, reloadToken]);
+  }, [bookingRef, reloadToken, location.key]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
