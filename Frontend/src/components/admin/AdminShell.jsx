@@ -20,36 +20,16 @@ const NAV_ITEM_BASE =
 
 function NavItem({ item, isActive }) {
   const iconClass = `text-xl ${isActive ? 'text-bk-teal' : 'text-bk-muted'}`
-  const content = (
-    <>
+  return (
+    <Link
+      to={item.to}
+      className={`${NAV_ITEM_BASE} ${
+        isActive ? 'bg-bk-teal-soft text-bk-teal-strong' : 'text-bk-text hover:bg-bk-bg'
+      }`}
+    >
       <MaterialIcon name={item.icon} className={iconClass} />
       {item.label}
-    </>
-  )
-
-  if (item.to) {
-    return (
-      <Link
-        to={item.to}
-        className={`${NAV_ITEM_BASE} ${
-          isActive ? 'bg-bk-teal-soft text-bk-teal-strong' : 'text-bk-text hover:bg-bk-bg'
-        }`}
-      >
-        {content}
-      </Link>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      className={`${NAV_ITEM_BASE} appearance-none cursor-default text-bk-muted`}
-    >
-      {content}
-      <span className="ml-auto rounded-full border border-bk-border bg-bk-bg px-[7px] py-px text-[10px] font-bold tracking-[0.04em] text-bk-muted max-[900px]:hidden">
-       
-      </span>
-    </button>
+    </Link>
   )
 }
 
