@@ -69,7 +69,7 @@ export function AdminStaffPage() {
         sortOptions={staff.sortOptions}
         onSortChange={staff.setSortBy}
         error={staff.error}
-        onRetry={staff.reload}
+        onRetry={staff.retry}
       />
 
       <StaffForm

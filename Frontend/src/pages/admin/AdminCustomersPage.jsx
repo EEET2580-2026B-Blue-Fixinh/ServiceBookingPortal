@@ -49,7 +49,7 @@ export function AdminCustomersPage() {
         sortOptions={customers.sortOptions}
         onSortChange={customers.setSortBy}
         error={customers.error}
-        onRetry={customers.reload}
+        onRetry={customers.retry}
       />
 
       <ActivateConfirmModal

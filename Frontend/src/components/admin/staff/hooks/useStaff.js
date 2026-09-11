@@ -58,6 +58,16 @@ export function useStaff() {
 
   useEffect(reload, [])
 
+  // The failure state's Try again. reload is also the mount effect, where a
+  // synchronous setState would trip react-hooks/set-state-in-effect, so it can't
+  // show the loading line itself. This event handler can, and it drops the old
+  // error first, so a retry that fails again visibly fails again.
+  const retry = () => {
+    setLoading(true)
+    setLoadError('')
+    reload()
+  }
+
   useEffect(() => {
     const thisRequest = ++requestId.current
     const trimmed = search.trim()
@@ -132,5 +142,6 @@ export function useStaff() {
     technicianCount,
     receptionistCount: allStaff.length - technicianCount,
     reload,
+    retry,
   }
 }

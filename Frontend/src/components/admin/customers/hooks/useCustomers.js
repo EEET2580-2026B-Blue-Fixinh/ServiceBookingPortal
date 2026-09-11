@@ -39,6 +39,16 @@ export function useCustomers() {
 
   useEffect(reload, [])
 
+  // The failure state's Try again. reload is also the mount effect, where a
+  // synchronous setState would trip react-hooks/set-state-in-effect, so it can't
+  // show the loading line itself. This event handler can, and it drops the old
+  // error first, so a retry that fails again visibly fails again.
+  const retry = () => {
+    setLoading(true)
+    setError('')
+    reload()
+  }
+
   useEffect(() => {
     fetchProvinces()
       .then((provinces) =>
@@ -111,5 +121,6 @@ export function useCustomers() {
     deactivatedCount: customers.length - activeCount,
     replaceCustomer,
     reload,
+    retry,
   }
 }
