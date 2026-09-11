@@ -104,17 +104,21 @@ because the response never arrives.
 - **Fix:** a read converter that maps unknown values to a sentinel, or filtering
   at the repository. Worth a decision before 5.2 lands, not a fix for this branch.
 
-### B3. `adminEndpoints.js` hardcodes its paths
+### B3. `adminEndpoints.js` hardcodes its paths · **fixed**
 
 `config/api.js` states the rule in its own doc comment: paths live in that file,
-and the endpoint module owns the method and body. Six calls in
-`adminEndpoints.js` build `/admin/...` inline instead.
+and the endpoint module owns the method and body. Six calls built `/admin/...`
+inline instead.
 
-Notifications follow the rule, so **the codebase now disagrees with itself** —
-which is worse than either convention applied consistently.
+Notifications followed the rule, so the codebase disagreed with itself — which
+is worse than either convention applied consistently.
 
-- **Fix:** move the six paths into `API_ENDPOINTS.ADMIN`.
-- **Flagged rather than silently refactored:** it is another branch's file.
+By the time this was fixed, `adminEndpoints.js` had already been split into
+`adminStaffEndpoints.js` and `adminCustomerEndpoints.js` under
+`components/admin/{staff,customers}/services/` (a different branch's layering
+change, unrelated to this item). Both now source their paths from a new
+`API_ENDPOINTS.ADMIN` block rather than building `/admin/...` inline; the
+endpoint functions themselves stay where the layering put them.
 
 ### B4. `bookingEndpoints.js` is 0 bytes
 
@@ -260,6 +264,48 @@ to re-run assertions on any of them.
 
 ---
 
+## F. Admin module — recorded by the admin branch (`dev/admin`)
+
+Raised during code review of Req 3.5.S1/S2/M1/M2. Verified against API
+Documentation v1.0 §2.5, §2.6, §10.1, §10.4 and Appendix E #5.
+
+### F1. `/admin/customers` skips §10.1's paging/search/sort contract
+
+§10.1 defines `q`, `status`, `provinceCode`, `sort` (`registeredAt,desc`
+default, `registeredAt,asc`, `fullName,asc`) and `page`/`size`, returned as
+§2.5's `{ items, page }` envelope. None of it is implemented: the endpoint
+returns every customer in one array, and `useCustomers.js` does the search,
+sort and pagination itself after the full roster has loaded.
+
+`/admin/staff` has the same client-side pattern but is blocked on Appendix E
+#5 (SMP not yet returning paging metadata) — an upstream, already-recorded
+dependency. `/admin/customers` has no such blocker: SBP owns customer data
+directly, so this is unimplemented rather than blocked.
+
+- **Fix:** implement `q`/`status`/`provinceCode`/`sort`/`page`/`size`
+  server-side for `/admin/customers`, matching §10.1. Scoped work, not
+  attempted here — flagged rather than built without a design sign-off.
+- **Owner:** Admin branch.
+
+### F2. Customer sort menu doesn't match §10.1's `sort` values
+
+§10.1 defines exactly `registeredAt,desc`/`,asc` and `fullName,asc`. The sort
+dropdown instead offers Name A–Z/Z–A, Status Active/Deactivated first and
+City A–Z — no `registeredAt`, and City isn't a field §10.1 lists as sortable.
+Resolves together with F1: once sort is server-side, either add
+`registeredAt` or drop what §10.1 doesn't define.
+- **Owner:** Admin branch, alongside F1.
+
+### F3. `/admin/staff`'s search parameter was `query`, not `q` · **fixed**
+
+§10.4 names it `q`. `AdminStaffController.listStaff` and
+`adminStaffEndpoints.js`'s `fetchStaff` both used `query`. Harmless in
+practice (frontend and backend agreed with each other, just not the doc), but
+exactly the kind of divergence a marker checking §10.4 against the code would
+trip over. Renamed the wire parameter to `q` on both sides.
+
+---
+
 ## Summary
 
 | # | Item | Owner | State |
@@ -269,7 +315,7 @@ to re-run assertions on any of them.
 | A3 | `GET /auth/me` documented, not implemented | Auth branch | Open |
 | B1 | `/error` masks failures as 401 | Security/config owner | **Open — cost two sessions** |
 | B2 | Unknown enum value 500s the list | Backend, before 5.2 | Open |
-| B3 | `adminEndpoints.js` hardcodes paths | Admin branch | Open |
+| B3 | `adminEndpoints.js` hardcodes paths | Admin branch | **Fixed** |
 | B4 | `bookingEndpoints.js` is empty | Booking branch | Open |
 | C1 | Dead `deliveryStatusOnArrival` | This branch | **Fixed, 10.5** |
 | C2 | Indentation drift, five sites | This branch | **Fixed, 10.5** |
@@ -281,3 +327,6 @@ to re-run assertions on any of them.
 | E2 | `String @Id` becomes an ObjectId | Tooling | Documented |
 | E3 | Mark of the Web blocks `.ps1` | Tooling | Documented |
 | E4 | No frontend test runner | Team decision | Deferred |
+| F1 | `/admin/customers` skips §10.1's paging/search/sort contract | Admin branch | Open |
+| F2 | Customer sort menu doesn't match §10.1's `sort` values | Admin branch | Open, with F1 |
+| F3 | Staff search parameter was `query`, doc says `q` | Admin branch | **Fixed** |
