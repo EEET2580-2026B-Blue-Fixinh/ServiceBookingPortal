@@ -45,6 +45,10 @@ export function useStaff() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [sortBy, setSortBy] = useState(STAFF_SORT_OPTIONS[0])
+  // Bumped on every successful reload so the active-search effect below
+  // re-runs and refreshes searchResults too - otherwise an edit or create
+  // made while a search is active never shows up until the query changes.
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Discards a search response that resolves after a newer one was already
   // requested, so fast typing can't let a stale result overwrite a fresh one.
@@ -52,7 +56,11 @@ export function useStaff() {
 
   const reload = () => {
     fetchStaff()
-      .then(setAllStaff)
+      .then((data) => {
+        setAllStaff(data)
+        setError('')
+        setRefreshKey((key) => key + 1)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }
@@ -68,16 +76,21 @@ export function useStaff() {
       setSearching(true)
       fetchStaff(trimmed)
         .then((data) => {
-          if (thisRequest === requestId.current) setSearchResults(data)
+          if (thisRequest === requestId.current) {
+            setSearchResults(data)
+            setError('')
+          }
         })
-        .catch((err) => setError(err.message))
+        .catch((err) => {
+          if (thisRequest === requestId.current) setError(err.message)
+        })
         .finally(() => {
           if (thisRequest === requestId.current) setSearching(false)
         })
     }, SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, refreshKey])
 
   const technicianCount = allStaff.filter((m) => m.staffRole === 'TECHNICIAN').length
 
