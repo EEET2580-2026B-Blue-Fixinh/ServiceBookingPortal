@@ -231,6 +231,9 @@ back.
 
 ## Working on it
 
+For the split between outbound outbox work (#55) and the inbound booking-event receiver
+(§11.7, Req 3.3.U2), see [SMP integration scope](docs/smp-integration-scope.md).
+
 Repo: [EEET2580-2026B-Blue-Fixinh/Service-Booking](https://github.com/EEET2580-2026B-Blue-Fixinh/Service-Booking).
 Feature branches (`dev/auth`, `dev/booking`, `dev/admin`, `setup/mongodb`) merge into `main`
 through pull requests. Commits follow `type(scope): summary`.
