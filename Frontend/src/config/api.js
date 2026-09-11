@@ -75,4 +75,18 @@ export const API_ENDPOINTS = {
       `/notifications/${encodeURIComponent(notificationId)}/read`,
     READ_ALL: "/notifications/read-all",
   },
+
+  ADMIN: {
+    CUSTOMERS: {
+      LIST: "/admin/customers",
+      STATUS: (customerId) =>
+        `/admin/customers/${encodeURIComponent(customerId)}/status`,
+    },
+    STAFF: {
+      LIST: "/admin/staff",
+      DETAIL: (staffId) => `/admin/staff/${encodeURIComponent(staffId)}`,
+      CREATE: "/admin/staff",
+      UPDATE: (staffId) => `/admin/staff/${encodeURIComponent(staffId)}`,
+    },
+  },
 };

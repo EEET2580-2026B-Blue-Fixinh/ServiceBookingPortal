@@ -1,56 +1,29 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { MaterialIcon } from '../shared/icons'
 import { useAuth } from '../../context/AuthContext'
+import { getInitials } from '../../utils/format'
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', to: '/admin' },
   { key: 'customers', label: 'Customers', icon: 'group', to: '/admin/customers' },
   { key: 'staff', label: 'Staff & technicians', icon: 'engineering', to: '/admin/staff' },
-  { key: 'account', label: 'My account', icon: 'account_circle' },
 ]
-
-function getInitials(fullName) {
-  if (!fullName) return '?'
-  const [first, ...rest] = fullName.trim().split(/\s+/)
-  const last = rest.at(-1)
-  return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase()
-}
 
 const NAV_ITEM_BASE =
   'flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 font-semibold no-underline max-[900px]:whitespace-nowrap'
 
 function NavItem({ item, isActive }) {
   const iconClass = `text-xl ${isActive ? 'text-bk-teal' : 'text-bk-muted'}`
-  const content = (
-    <>
+  return (
+    <Link
+      to={item.to}
+      className={`${NAV_ITEM_BASE} ${
+        isActive ? 'bg-bk-teal-soft text-bk-teal-strong' : 'text-bk-text hover:bg-bk-bg'
+      }`}
+    >
       <MaterialIcon name={item.icon} className={iconClass} />
       {item.label}
-    </>
-  )
-
-  if (item.to) {
-    return (
-      <Link
-        to={item.to}
-        className={`${NAV_ITEM_BASE} ${
-          isActive ? 'bg-bk-teal-soft text-bk-teal-strong' : 'text-bk-text hover:bg-bk-bg'
-        }`}
-      >
-        {content}
-      </Link>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      className={`${NAV_ITEM_BASE} appearance-none cursor-default text-bk-muted`}
-    >
-      {content}
-      <span className="ml-auto rounded-full border border-bk-border bg-bk-bg px-[7px] py-px text-[10px] font-bold tracking-[0.04em] text-bk-muted max-[900px]:hidden">
-       
-      </span>
-    </button>
+    </Link>
   )
 }
 

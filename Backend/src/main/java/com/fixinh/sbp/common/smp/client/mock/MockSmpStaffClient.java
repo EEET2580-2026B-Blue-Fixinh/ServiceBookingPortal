@@ -79,25 +79,30 @@ public class MockSmpStaffClient implements SmpStaffClient {
 
 	@Override
 	public SmpStaffDto createStaff(SmpStaffCreateRequest request) {
-		boolean emailTaken = staffById.values().stream()
-				.anyMatch(staff -> staff.email().equalsIgnoreCase(request.email()));
-		if (emailTaken) {
-			throw new SmpDuplicateEmailException(request.email());
+		// The duplicate-email check and the insert must be one atomic step - synchronizing only
+		// the check (or only the insert) still lets two concurrent requests for the same email
+		// both pass the check before either inserts.
+		synchronized (staffById) {
+			boolean emailTaken = staffById.values().stream()
+					.anyMatch(staff -> staff.email().equalsIgnoreCase(request.email()));
+			if (emailTaken) {
+				throw new SmpDuplicateEmailException(request.email());
+			}
+
+			SmpStaffDto created = new SmpStaffDto(
+					nextStaffId(request.staffRole()),
+					request.fullName(),
+					request.email(),
+					request.phoneNumber(),
+					request.staffRole(),
+					EmploymentStatus.ACTIVE,
+					request.address(),
+					request.branchProvinceCode(),
+					generateInitialPassword());
+
+			staffById.put(created.staffId(), created);
+			return created;
 		}
-
-		SmpStaffDto created = new SmpStaffDto(
-				nextStaffId(request.staffRole()),
-				request.fullName(),
-				request.email(),
-				request.phoneNumber(),
-				request.staffRole(),
-				EmploymentStatus.ACTIVE,
-				request.address(),
-				request.branchProvinceCode(),
-				generateInitialPassword());
-
-		staffById.put(created.staffId(), created);
-		return created;
 	}
 
 	@Override

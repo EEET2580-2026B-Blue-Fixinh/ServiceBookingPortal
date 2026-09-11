@@ -1,6 +1,5 @@
 import { AdminShell } from '../../components/admin/AdminShell'
 import { StaffForm } from '../../components/admin/staff/ui/StaffForm'
-import { StaffSearch } from '../../components/admin/staff/ui/StaffSearch'
 import { StaffList } from '../../components/admin/staff/ui/StaffList'
 import { MaterialIcon } from '../../components/shared/icons'
 import { useStaff } from '../../components/admin/staff/hooks/useStaff'
@@ -49,22 +48,28 @@ export function AdminStaffPage() {
         </p>
       )}
 
-      <StaffSearch
-        value={staff.search}
-        onChange={staff.setSearch}
-        matchCount={staff.staff.length}
-        totalCount={staff.total}
-        searching={staff.searching}
-      />
-
       <StaffList
         staff={staff.staff}
         total={staff.total}
+        matchCount={staff.matchCount}
         loading={staff.loading}
         technicianCount={staff.technicianCount}
         receptionistCount={staff.receptionistCount}
         loadingStaffId={form.loadingStaffId}
         onEdit={form.openEdit}
+        page={staff.page}
+        pageSize={staff.pageSize}
+        onPageChange={staff.setPage}
+        pageSizeOptions={staff.pageSizeOptions}
+        onPageSizeChange={staff.setPageSize}
+        search={staff.search}
+        onSearchChange={staff.setSearch}
+        searching={staff.searching}
+        sortBy={staff.sortBy}
+        sortOptions={staff.sortOptions}
+        onSortChange={staff.setSortBy}
+        error={staff.error}
+        onRetry={staff.retry}
       />
 
       <StaffForm

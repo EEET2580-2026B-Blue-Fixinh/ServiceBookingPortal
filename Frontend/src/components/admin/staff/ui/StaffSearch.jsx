@@ -1,21 +1,20 @@
-import { MaterialIcon } from '../../../shared/icons'
+import { ListToolbar } from '../../../shared/ListToolbar'
 
-export function StaffSearch({ value, onChange, matchCount, totalCount, searching }) {
+/** The staff table's toolbar: search, sort, and match count. Lives inside StaffList's card. */
+export function StaffSearch({ value, onChange, sortBy, sortOptions, onSortChange, matchCount, totalCount, searching }) {
   return (
-    <div className="mb-[18px] flex items-center gap-3.5 max-[700px]:flex-wrap">
-      <div className="flex flex-1 items-center gap-2 rounded-[9px] border border-bk-border bg-bk-surface px-3 focus-within:border-bk-teal focus-within:ring-[3px] focus-within:ring-bk-teal-soft">
-        <MaterialIcon name="search" className="shrink-0 text-[19px] text-bk-muted" />
-        <input
-          type="text"
-          placeholder="Search by name, staff ID or email"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent py-2.5 font-[inherit] text-bk-text focus:outline-none"
-        />
-      </div>
-      <p className="shrink-0 font-mono text-[12.5px] text-bk-muted">
-        {searching ? 'Searching…' : `${matchCount} of ${totalCount} staff accounts`}
-      </p>
-    </div>
+    <ListToolbar
+      value={value}
+      onChange={onChange}
+      placeholder="Search by name, staff ID or email"
+      ariaLabel="Search staff by name, staff ID or email"
+      sortBy={sortBy}
+      sortOptions={sortOptions}
+      onSortChange={onSortChange}
+      matchCount={matchCount}
+      totalCount={totalCount}
+      itemNoun="staff accounts"
+      searching={searching}
+    />
   )
 }

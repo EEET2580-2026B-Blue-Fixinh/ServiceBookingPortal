@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.admin.service;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -121,8 +122,11 @@ public class AdminServiceImpl implements AdminInternalService {
 
 	@Override
 	public List<StaffDto> listStaff(String query) {
+		// Built once per call rather than re-scanning the province list per row.
+		Map<String, String> provinceNames = provinceNamesByCode();
 		return smpStaffClient.listStaff(query).stream()
-				.map(staff -> StaffDto.listItem(staff, branchProvinceName(staff.branchProvinceCode())))
+				.map(staff -> StaffDto.listItem(staff,
+						provinceNames.getOrDefault(staff.branchProvinceCode(), staff.branchProvinceCode())))
 				.toList();
 	}
 
@@ -183,10 +187,11 @@ public class AdminServiceImpl implements AdminInternalService {
 	}
 
 	private String branchProvinceName(String branchProvinceCode) {
+		return provinceNamesByCode().getOrDefault(branchProvinceCode, branchProvinceCode);
+	}
+
+	private Map<String, String> provinceNamesByCode() {
 		return referenceService.listProvinces().stream()
-				.filter(province -> province.provinceCode().equals(branchProvinceCode))
-				.findFirst()
-				.map(ProvinceDto::provinceName)
-				.orElse(branchProvinceCode);
+				.collect(Collectors.toMap(ProvinceDto::provinceCode, ProvinceDto::provinceName, (first, duplicate) -> first));
 	}
 }

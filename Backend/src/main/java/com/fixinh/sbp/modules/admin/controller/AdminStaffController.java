@@ -31,7 +31,7 @@ public class AdminStaffController {
 	private final AdminInternalService adminService;
 
 	@GetMapping
-	public ListResponse<StaffDto> listStaff(@RequestParam(required = false) String query) {
+	public ListResponse<StaffDto> listStaff(@RequestParam(name = "q", required = false) String query) {
 		return new ListResponse<>(adminService.listStaff(query));
 	}
 

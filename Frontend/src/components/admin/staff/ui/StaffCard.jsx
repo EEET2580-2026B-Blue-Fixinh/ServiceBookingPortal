@@ -1,9 +1,4 @@
-function getInitials(fullName) {
-  if (!fullName) return '?'
-  const [first, ...rest] = fullName.trim().split(/\s+/)
-  const last = rest.at(-1)
-  return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase()
-}
+import { getInitials } from '../../../../utils/format'
 
 function RolePill({ role }) {
   const isTechnician = role === 'TECHNICIAN'

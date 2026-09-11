@@ -57,6 +57,7 @@ export function useStaffForm({ onNotice, onReload }) {
         onNotice({ variant: 'success', message: 'Staff account created. Welcome email sent.' })
       } else {
         await updateStaff(initialValues.staffId, payload)
+        onNotice({ variant: 'success', message: 'Staff account updated.' })
       }
       close()
       onReload()

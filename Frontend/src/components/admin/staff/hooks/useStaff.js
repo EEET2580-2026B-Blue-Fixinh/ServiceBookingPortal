@@ -1,7 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchStaff } from '../services/adminStaffEndpoints'
+import { usePagedList } from '../../../../hooks/usePagedList'
+import { byName, fieldFirst } from '../../../../utils/sortComparators'
 
 const SEARCH_DEBOUNCE_MS = 300
+
+const STAFF_SORTS = {
+  'Name (A–Z)': byName,
+  'Name (Z–A)': (a, b) => byName(b, a),
+  'Status (Active first)': fieldFirst('employmentStatus', 'ACTIVE'),
+  'Status (Inactive first)': fieldFirst('employmentStatus', 'INACTIVE'),
+  'Role (A–Z)': (a, b) => a.staffRole.localeCompare(b.staffRole) || byName(a, b),
+  'Branch (A–Z)': (a, b) =>
+    (a.branchProvinceName ?? '').localeCompare(b.branchProvinceName ?? '') || byName(a, b),
+}
+
+export const STAFF_SORT_OPTIONS = Object.keys(STAFF_SORTS)
 
 /**
  * Loads the staff/technician list and delegates search to the backend/mocked
@@ -17,9 +31,15 @@ export function useStaff() {
   const [searchResults, setSearchResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [searchError, setSearchError] = useState('')
   const [notice, setNotice] = useState(null)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState(STAFF_SORT_OPTIONS[0])
+  // Bumped on every successful reload so the active-search effect below
+  // re-runs and refreshes searchResults too - otherwise an edit or create
+  // made while a search is active never shows up until the query changes.
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Discards a search response that resolves after a newer one was already
   // requested, so fast typing can't let a stale result overwrite a fresh one.
@@ -27,47 +47,101 @@ export function useStaff() {
 
   const reload = () => {
     fetchStaff()
-      .then(setAllStaff)
-      .catch((err) => setError(err.message))
+      .then((data) => {
+        setAllStaff(data)
+        setLoadError('')
+        setRefreshKey((key) => key + 1)
+      })
+      .catch((err) => setLoadError(err.message))
       .finally(() => setLoading(false))
   }
 
   useEffect(reload, [])
 
+  // The failure state's Try again. reload is also the mount effect, where a
+  // synchronous setState would trip react-hooks/set-state-in-effect, so it can't
+  // show the loading line itself. This event handler can, and it drops the old
+  // error first, so a retry that fails again visibly fails again.
+  const retry = () => {
+    setLoading(true)
+    setLoadError('')
+    reload()
+  }
+
   useEffect(() => {
+    const thisRequest = ++requestId.current
     const trimmed = search.trim()
     if (!trimmed) return
 
-    const thisRequest = ++requestId.current
     const timer = setTimeout(() => {
       setSearching(true)
       fetchStaff(trimmed)
         .then((data) => {
-          if (thisRequest === requestId.current) setSearchResults(data)
+          if (thisRequest === requestId.current) {
+            setSearchResults(data)
+            setSearchError('')
+          }
         })
-        .catch((err) => setError(err.message))
+        .catch((err) => {
+          if (thisRequest === requestId.current) setSearchError(err.message)
+        })
         .finally(() => {
           if (thisRequest === requestId.current) setSearching(false)
         })
     }, SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, refreshKey])
 
   const technicianCount = allStaff.filter((m) => m.staffRole === 'TECHNICIAN').length
 
+  // The list the table is paging through: the search response when searching,
+  // otherwise the full roster.
+  const visibleStaff = search.trim() ? (searchResults ?? allStaff) : allStaff
+  const sortedStaff = [...visibleStaff].sort(STAFF_SORTS[sortBy])
+
+  const paged = usePagedList(sortedStaff)
+
+  // A new search or sort makes the current page number meaningless, so it
+  // sends the reader back to the first page.
+  const changeSearch = (value) => {
+    setSearch(value)
+    // An error about the previous query says nothing about the next one.
+    setSearchError('')
+    // Clearing the box supersedes any search still in flight, so that request's
+    // finally no longer resets the flag - and an empty box has nothing left to
+    // be searching for.
+    if (!value.trim()) setSearching(false)
+    paged.resetPage()
+  }
+
+  const changeSort = (value) => {
+    setSortBy(value)
+    paged.resetPage()
+  }
+
   return {
-    staff: search.trim() ? (searchResults ?? allStaff) : allStaff,
+    staff: paged.pageItems,
+    matchCount: visibleStaff.length,
     total: allStaff.length,
+    page: paged.page,
+    pageSize: paged.pageSize,
+    setPage: paged.setPage,
+    pageSizeOptions: paged.pageSizeOptions,
+    setPageSize: paged.setPageSize,
     loading,
     searching,
-    error,
+    error: loadError || searchError,
     notice,
     setNotice,
     search,
-    setSearch,
+    setSearch: changeSearch,
+    sortBy,
+    setSortBy: changeSort,
+    sortOptions: STAFF_SORT_OPTIONS,
     technicianCount,
     receptionistCount: allStaff.length - technicianCount,
     reload,
+    retry,
   }
 }
