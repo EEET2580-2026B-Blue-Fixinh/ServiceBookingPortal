@@ -96,6 +96,12 @@ export function useStaff() {
   // sends the reader back to the first page.
   const changeSearch = (value) => {
     setSearch(value)
+    // An error about the previous query says nothing about the next one.
+    setSearchError('')
+    // Clearing the box supersedes any search still in flight, so that request's
+    // finally no longer resets the flag - and an empty box has nothing left to
+    // be searching for.
+    if (!value.trim()) setSearching(false)
     paged.resetPage()
   }
 
