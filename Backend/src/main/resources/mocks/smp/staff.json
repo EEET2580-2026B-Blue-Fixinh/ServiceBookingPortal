@@ -9,7 +9,7 @@
 		"address": {
 			"streetNumber": "12",
 			"streetName": "Nguyen Trai",
-			"ward": "Ben Thanh Ward",
+			"ward": "Phường Bến Thành",
 			"provinceCode": "HCM"
 		},
 		"branchProvinceCode": "HCM",
@@ -25,7 +25,7 @@
 		"address": {
 			"streetNumber": "45",
 			"streetName": "Tran Hung Dao",
-			"ward": "Cau Kho Ward",
+			"ward": "Phường Cầu Ông Lãnh",
 			"provinceCode": "HCM"
 		},
 		"branchProvinceCode": "HCM",
@@ -41,7 +41,7 @@
 		"address": {
 			"streetNumber": "8",
 			"streetName": "Le Loi",
-			"ward": "Ben Nghe Ward",
+			"ward": "Phường Sài Gòn",
 			"provinceCode": "HCM"
 		},
 		"branchProvinceCode": "HCM",
@@ -57,7 +57,7 @@
 		"address": {
 			"streetNumber": "20",
 			"streetName": "Hai Ba Trung",
-			"ward": "Tan Dinh Ward",
+			"ward": "Phường Tân Định",
 			"provinceCode": "HCM"
 		},
 		"branchProvinceCode": "HCM",
@@ -73,7 +73,7 @@
 		"address": {
 			"streetNumber": "56",
 			"streetName": "Trang Tien",
-			"ward": "Trang Tien Ward",
+			"ward": "Phường Cửa Nam",
 			"provinceCode": "HN"
 		},
 		"branchProvinceCode": "HN",
@@ -89,7 +89,7 @@
 		"address": {
 			"streetNumber": "23",
 			"streetName": "Hang Bac",
-			"ward": "Hang Bac Ward",
+			"ward": "Phường Hoàn Kiếm",
 			"provinceCode": "HN"
 		},
 		"branchProvinceCode": "HN",
@@ -105,7 +105,7 @@
 		"address": {
 			"streetNumber": "101",
 			"streetName": "Bach Dang",
-			"ward": "Hai Chau Ward",
+			"ward": "Phường Hải Châu",
 			"provinceCode": "DN"
 		},
 		"branchProvinceCode": "DN",
@@ -121,7 +121,7 @@
 		"address": {
 			"streetNumber": "7",
 			"streetName": "Nguyen Van Linh",
-			"ward": "Thanh Khe Ward",
+			"ward": "Phường Thanh Khê",
 			"provinceCode": "DN"
 		},
 		"branchProvinceCode": "DN",
@@ -137,7 +137,7 @@
 		"address": {
 			"streetNumber": "15",
 			"streetName": "Nguyen Van Cu",
-			"ward": "An Hoa Ward",
+			"ward": "Phường Ninh Kiều",
 			"provinceCode": "CT"
 		},
 		"branchProvinceCode": "CT",
@@ -153,7 +153,7 @@
 		"address": {
 			"streetNumber": "33",
 			"streetName": "Mau Than",
-			"ward": "Xuan Khanh Ward",
+			"ward": "Phường Cái Khế",
 			"provinceCode": "CT"
 		},
 		"branchProvinceCode": "CT",
@@ -169,7 +169,7 @@
 		"address": {
 			"streetNumber": "88",
 			"streetName": "Le Loi",
-			"ward": "Phu Hoi Ward",
+			"ward": "Phường Thuận Hóa",
 			"provinceCode": "HUE"
 		},
 		"branchProvinceCode": "HUE",
@@ -185,7 +185,7 @@
 		"address": {
 			"streetNumber": "19",
 			"streetName": "Dien Bien Phu",
-			"ward": "May To Ward",
+			"ward": "Phường Ngô Quyền",
 			"provinceCode": "HP"
 		},
 		"branchProvinceCode": "HP",
@@ -201,7 +201,7 @@
 		"address": {
 			"streetNumber": "4",
 			"streetName": "Dien Bien Phu",
-			"ward": "May To Ward",
+			"ward": "Phường Lê Chân",
 			"provinceCode": "HP"
 		},
 		"branchProvinceCode": "HP",
@@ -216,9 +216,9 @@
 		"employmentStatus": "ACTIVE",
 		"address": {
 			"streetNumber": "27",
-			"streetName": "Nguyen Van Linh",
-			"ward": "Thanh Khe Ward",
-			"provinceCode": "DN"
+			"streetName": "Doi Can",
+			"ward": "Phường Ba Đình",
+			"provinceCode": "HN"
 		},
 		"branchProvinceCode": "HN",
 		"initialPassword": null
