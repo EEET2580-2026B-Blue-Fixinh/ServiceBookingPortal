@@ -1,6 +1,7 @@
 package com.fixinh.sbp.modules.auth.interfaces.internal;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.fixinh.sbp.common.security.AccountStatus;
 import com.fixinh.sbp.common.security.Role;
@@ -25,4 +26,20 @@ public interface AuthInternalService {
 	 *         has this id
 	 */
 	UserCredential setAccountStatus(String id, AccountStatus status);
+
+	/**
+	 * The credential behind a token's {@code sub} — phone number, sign-in providers and
+	 * account status all live here rather than on the profile. Empty if this id names no
+	 * credential.
+	 */
+	Optional<UserCredential> findById(String id);
+
+	/**
+	 * Changes the phone number on an existing credential, enforcing the same system-wide
+	 * uniqueness registration does (API Documentation Section 6.2).
+	 *
+	 * @throws com.fixinh.sbp.common.exception.ApiException CUSTOMER_NOT_FOUND if no credential
+	 *         has this id, PHONE_ALREADY_REGISTERED if another credential already holds it
+	 */
+	UserCredential updatePhoneNumber(String id, String phoneNumber);
 }
