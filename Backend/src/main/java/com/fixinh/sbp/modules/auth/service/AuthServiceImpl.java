@@ -347,6 +347,22 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		return credentialRepository.findById(id);
 	}
 
+	@Override
+	public UserCredential updatePhoneNumber(String id, String phoneNumber) {
+		UserCredential credential = credentialRepository.findById(id)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+		String trimmed = phoneNumber.trim();
+		// Skipped when the number is unchanged: the caller's own current number would otherwise
+		// fail the uniqueness check against itself.
+		if (!trimmed.equals(credential.getPhoneNumber()) && credentialRepository.existsByPhoneNumber(trimmed)) {
+			throw new ApiException(ErrorCode.PHONE_ALREADY_REGISTERED);
+		}
+
+		credential.setPhoneNumber(trimmed);
+		return credentialRepository.save(credential);
+	}
+
 	/** One field takes both, so the server works out which was typed (see LoginCommand). */
 	private Optional<UserCredential> findCredential(String identifier) {
 		if (identifier == null || identifier.isBlank()) {

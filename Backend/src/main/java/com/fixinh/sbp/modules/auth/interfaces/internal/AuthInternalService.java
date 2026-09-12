@@ -33,4 +33,13 @@ public interface AuthInternalService {
 	 * credential.
 	 */
 	Optional<UserCredential> findById(String id);
+
+	/**
+	 * Changes the phone number on an existing credential, enforcing the same system-wide
+	 * uniqueness registration does (API Documentation Section 6.2).
+	 *
+	 * @throws com.fixinh.sbp.common.exception.ApiException CUSTOMER_NOT_FOUND if no credential
+	 *         has this id, PHONE_ALREADY_REGISTERED if another credential already holds it
+	 */
+	UserCredential updatePhoneNumber(String id, String phoneNumber);
 }

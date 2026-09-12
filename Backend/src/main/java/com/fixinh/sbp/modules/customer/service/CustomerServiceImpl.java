@@ -25,6 +25,7 @@ import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.customer.dto.external.CustomerProfileDto;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.UpdateProfileCommand;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 import com.fixinh.sbp.modules.customer.model.Address;
@@ -58,8 +59,11 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 	 */
 	private final AuthInternalService authService;
 
-	/** The province catalogue, so {@link #getMyProfile} can denormalise a name onto the code. */
+	/** The province catalogue, so profile reads can denormalise a name onto the code. */
 	private final ReferenceExternalService referenceService;
+
+	/** PUT /customers/me's field rules (API Documentation Section 6.2, Appendix C). */
+	private final CustomerProfileValidator profileValidator;
 
 	/**
 	 * Written out by hand rather than via {@code @RequiredArgsConstructor}: Lombok does not copy
@@ -72,13 +76,15 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 			CredentialRegionUpdater credentialRegionUpdater,
 			ShardDirectoryRepository shardDirectory,
 			@Lazy AuthInternalService authService,
-			ReferenceExternalService referenceService) {
+			ReferenceExternalService referenceService,
+			CustomerProfileValidator profileValidator) {
 		this.customerRepository = customerRepository;
 		this.regionResolver = regionResolver;
 		this.credentialRegionUpdater = credentialRegionUpdater;
 		this.shardDirectory = shardDirectory;
 		this.authService = authService;
 		this.referenceService = referenceService;
+		this.profileValidator = profileValidator;
 	}
 
 	@Override
@@ -166,29 +172,85 @@ public class CustomerServiceImpl implements CustomerInternalService, CustomerExt
 		UserCredential credential = authService.findById(customerId)
 				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
 
+		return CustomerProfileDto.from(profile, credential.getPhoneNumber(), credential.getAccountStatus(),
+				authProvidersOf(credential), provinceNameOf(profile.getAddress()));
+	}
+
+	@Override
+	public CustomerProfileDto updateMyProfile(String customerId, UpdateProfileCommand command) {
+		profileValidator.validate(command);
+
+		Customer profile = customerRepository.findById(customerId)
+				.orElseThrow(() -> new ApiException(ErrorCode.CUSTOMER_NOT_FOUND));
+
+		// Phone uniqueness checked, and the credential updated, before any profile field is
+		// touched — a rejected phone number must leave the rest of the profile untouched.
+		UserCredential credential = authService.updatePhoneNumber(customerId, command.phoneNumber());
+
+		UpdateProfileCommand.AddressCommand addressCommand = command.address();
+		Address address = Address.builder()
+				.streetNumber(addressCommand.streetNumber().trim())
+				.streetName(addressCommand.streetName().trim())
+				.ward(addressCommand.ward().trim())
+				.provinceCode(addressCommand.provinceCode().trim())
+				.build();
+
+		Region previousRegion = profile.getHomeRegion();
+		Address previousAddress = profile.getAddress();
+		Region targetRegion = regionResolver.resolve(address.getProvinceCode());
+
+		profile.setFullName(command.fullName().trim());
+		profile.setAddress(address);
+		profile.setHomeRegion(targetRegion);
+		customerRepository.relocate(profile, previousRegion);
+
+		// Only when the province actually moves the record to the other store — completeAddress
+		// always pays this price because it moves off the placeholder default region, but a plain
+		// edit that keeps the same city has no directory entry or Google credential to touch.
+		if (targetRegion != previousRegion) {
+			try {
+				credentialRegionUpdater.relocateGoogleCredential(customerId, targetRegion);
+				shardDirectory.register(SubjectType.CUSTOMER, customerId, targetRegion);
+			}
+			catch (RuntimeException ex) {
+				try {
+					credentialRegionUpdater.relocateGoogleCredential(customerId, previousRegion);
+				}
+				finally {
+					restoreLocation(customerId, previousAddress, previousRegion);
+				}
+				throw ex;
+			}
+		}
+
+		return CustomerProfileDto.from(profile, credential.getPhoneNumber(), credential.getAccountStatus(),
+				authProvidersOf(credential), provinceNameOf(address));
+	}
+
+	/**
+	 * Declaration order (PASSWORD, GOOGLE), not the HashSet's, so the response is stable across
+	 * calls rather than depending on hash bucket order (API Documentation Section 6.1 shows
+	 * PASSWORD before GOOGLE).
+	 */
+	private List<String> authProvidersOf(UserCredential credential) {
 		Set<AuthProvider> providers = credential.getAuthProviders();
-		// Declaration order (PASSWORD, GOOGLE), not the HashSet's, so the response is stable
-		// across calls rather than depending on hash bucket order (API Documentation Section 6.1
-		// shows PASSWORD before GOOGLE).
-		List<String> authProviders = providers == null
+		return providers == null
 				? List.of()
 				: Arrays.stream(AuthProvider.values())
 						.filter(providers::contains)
 						.map(Enum::name)
 						.toList();
+	}
 
-		String provinceName = null;
-		Address address = profile.getAddress();
-		if (address != null) {
-			provinceName = referenceService.listProvinces().stream()
-					.filter(province -> province.provinceCode().equals(address.getProvinceCode()))
-					.map(ProvinceDto::provinceName)
-					.findFirst()
-					.orElse(null);
+	private String provinceNameOf(Address address) {
+		if (address == null) {
+			return null;
 		}
-
-		return CustomerProfileDto.from(
-				profile, credential.getPhoneNumber(), credential.getAccountStatus(), authProviders, provinceName);
+		return referenceService.listProvinces().stream()
+				.filter(province -> province.provinceCode().equals(address.getProvinceCode()))
+				.map(ProvinceDto::provinceName)
+				.findFirst()
+				.orElse(null);
 	}
 
 	@Override

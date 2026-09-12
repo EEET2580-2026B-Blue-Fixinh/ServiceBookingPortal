@@ -2,8 +2,10 @@ package com.fixinh.sbp.modules.customer.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fixinh.sbp.common.exception.ApiException;
+import com.fixinh.sbp.common.exception.ErrorCode;
 import com.fixinh.sbp.common.security.AccountStatus;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.common.sharding.RegionResolver;
@@ -26,6 +29,7 @@ import com.fixinh.sbp.modules.auth.model.AuthProvider;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.customer.dto.external.CustomerProfileDto;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
+import com.fixinh.sbp.modules.customer.dto.internal.UpdateProfileCommand;
 import com.fixinh.sbp.modules.customer.model.Address;
 import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.customer.repository.CustomerRepository;
@@ -39,6 +43,7 @@ class CustomerServiceImplTest {
 	private ShardDirectoryRepository directory;
 	private AuthInternalService authService;
 	private ReferenceExternalService referenceService;
+	private CustomerProfileValidator profileValidator;
 	private CustomerServiceImpl service;
 
 	@BeforeEach
@@ -49,7 +54,9 @@ class CustomerServiceImplTest {
 		directory = mock(ShardDirectoryRepository.class);
 		authService = mock(AuthInternalService.class);
 		referenceService = mock(ReferenceExternalService.class);
-		service = new CustomerServiceImpl(repository, resolver, credentials, directory, authService, referenceService);
+		profileValidator = mock(CustomerProfileValidator.class);
+		service = new CustomerServiceImpl(
+				repository, resolver, credentials, directory, authService, referenceService, profileValidator);
 	}
 
 	@Test
@@ -110,6 +117,68 @@ class CustomerServiceImplTest {
 		assertEquals("Ho Chi Minh City", profile.address().provinceName());
 		assertEquals(AccountStatus.ACTIVE, profile.accountStatus());
 		assertEquals("0912345678", profile.phoneNumber());
+	}
+
+	@Test
+	void updatesProfileWithoutRelocatingWhenProvinceUnchanged() {
+		Address address = Address.builder().streetNumber("1").streetName("Main Street")
+				.ward("Ward 1").provinceCode("HCM").build();
+		Customer customer = Customer.builder().id("user-1").fullName("Old Name")
+				.email("an@example.com").address(address).homeRegion(Region.SOUTH).build();
+		UserCredential credential = UserCredential.builder().id("user-1").phoneNumber("0912345678")
+				.accountStatus(AccountStatus.ACTIVE).authProviders(Set.of(AuthProvider.PASSWORD)).build();
+
+		when(repository.findById("user-1")).thenReturn(Optional.of(customer));
+		when(authService.updatePhoneNumber("user-1", "0912345678")).thenReturn(credential);
+		when(resolver.resolve("HCM")).thenReturn(Region.SOUTH);
+		when(referenceService.listProvinces()).thenReturn(
+				List.of(new ProvinceDto("HCM", "Ho Chi Minh City", true, "79")));
+
+		CustomerProfileDto updated =
+				service.updateMyProfile("user-1", updateCommand("New Name", "0912345678", "HCM"));
+
+		assertEquals("New Name", updated.fullName());
+		verify(repository).relocate(customer, Region.SOUTH);
+		verify(credentials, never()).relocateGoogleCredential(any(), any());
+		verify(directory, never()).register(any(), any(), any());
+	}
+
+	@Test
+	void relocatesCredentialAndDirectoryWhenProvinceChanges() {
+		Address address = Address.builder().streetNumber("1").streetName("Main Street")
+				.ward("Ward 1").provinceCode("HCM").build();
+		Customer customer = Customer.builder().id("user-1").fullName("Name")
+				.email("an@example.com").address(address).homeRegion(Region.SOUTH).build();
+		UserCredential credential = UserCredential.builder().id("user-1").phoneNumber("0912345678")
+				.accountStatus(AccountStatus.ACTIVE).authProviders(Set.of(AuthProvider.PASSWORD)).build();
+
+		when(repository.findById("user-1")).thenReturn(Optional.of(customer));
+		when(authService.updatePhoneNumber("user-1", "0912345678")).thenReturn(credential);
+		when(resolver.resolve("HN")).thenReturn(Region.NORTH);
+		when(referenceService.listProvinces()).thenReturn(List.of());
+
+		service.updateMyProfile("user-1", updateCommand("Name", "0912345678", "HN"));
+
+		verify(repository).relocate(customer, Region.SOUTH);
+		verify(credentials).relocateGoogleCredential("user-1", Region.NORTH);
+		verify(directory).register(SubjectType.CUSTOMER, "user-1", Region.NORTH);
+	}
+
+	@Test
+	void propagatesPhoneConflictWithoutTouchingTheProfile() {
+		Customer customer = incompleteCustomer();
+		when(repository.findById("user-1")).thenReturn(Optional.of(customer));
+		when(authService.updatePhoneNumber("user-1", "0912345678"))
+				.thenThrow(new ApiException(ErrorCode.PHONE_ALREADY_REGISTERED));
+
+		assertThrows(ApiException.class,
+				() -> service.updateMyProfile("user-1", updateCommand("Name", "0912345678", "HN")));
+		verify(repository, never()).relocate(any(), any());
+	}
+
+	private UpdateProfileCommand updateCommand(String fullName, String phoneNumber, String provinceCode) {
+		return new UpdateProfileCommand(fullName, phoneNumber,
+				new UpdateProfileCommand.AddressCommand("1", "Main Street", "Ward 1", provinceCode));
 	}
 
 	private Customer incompleteCustomer() {
