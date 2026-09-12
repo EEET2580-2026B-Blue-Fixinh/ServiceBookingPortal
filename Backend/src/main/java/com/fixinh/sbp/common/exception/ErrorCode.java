@@ -53,6 +53,29 @@ public enum ErrorCode {
 	OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.BAD_GATEWAY,
 			"Google sign-in is temporarily unavailable. Please try again."),
 
+	/**
+	 * A request Spring MVC could not dispatch or read at all — the four below are the shapes
+	 * a caller can get wrong before any controller runs.
+	 *
+	 * <p>They exist because {@code GlobalExceptionHandler}'s catch-all would otherwise answer
+	 * every one of them with 500 {@code INTERNAL_ERROR}: the handler for {@code Exception} is
+	 * consulted ahead of Spring's own resolver, so a mistake in the request would be reported
+	 * as a fault on our side and logged as one.
+	 *
+	 * <p><b>Not in Appendix B.</b> The appendix names no code for a wrong method, a wrong
+	 * media type or a path that maps to nothing, and §2.7's status table lists neither 405 nor
+	 * 415. Raised as a discrepancy for the appendix to catch up.
+	 */
+	// --- Top-level: requests that never reach a controller ---
+	ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND,
+			"No endpoint exists at this path. Check the method and the URL."),
+	METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED,
+			"That method is not allowed on this endpoint. The Allow header lists the ones that are."),
+	REQUEST_MALFORMED(HttpStatus.BAD_REQUEST,
+			"The request body could not be read as JSON."),
+	UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+			"This endpoint does not accept that Content-Type."),
+
 	// --- Top-level: validation and conflicts ---
 	VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "One or more fields are invalid."),
 	EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, "This email is already registered."),
