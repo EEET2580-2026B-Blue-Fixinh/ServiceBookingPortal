@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.fixinh.sbp.common.dto.ErrorResponse;
@@ -97,11 +98,18 @@ public class GlobalExceptionHandler {
 	/**
 	 * A path that maps to nothing.
 	 *
+	 * <p>Two exceptions for one situation. With Spring Boot's static-resource mapping on, the
+	 * default, an unmatched path falls through to the resource handler, which throws
+	 * {@code NoResourceFoundException}; with it off, the dispatcher itself throws
+	 * {@code NoHandlerFoundException}. This is an API that serves no static content, so that
+	 * mapping is a setting someone may reasonably turn off one day, and the answer should not
+	 * quietly become a 500 when they do.
+	 *
 	 * <p>Its own code rather than one of the resource 404s. "This path does not exist" and
 	 * "the booking you asked for is not there" are different answers, and a client that
 	 * cannot tell them apart retries the wrong one.
 	 */
-	@ExceptionHandler(NoResourceFoundException.class)
+	@ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
 	public ResponseEntity<ErrorResponse> handleNoEndpoint(HttpServletRequest request) {
 		log.debug("No endpoint at {} {}", request.getMethod(), request.getRequestURI());
 
