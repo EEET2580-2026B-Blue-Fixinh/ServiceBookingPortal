@@ -36,9 +36,4 @@ public interface NotificationExternalService {
 	 * have notifications at all, succeeds without changing anything.
 	 */
 	void markAllRead(String callerId, Role callerRole);
-
-	/**
-	 * How many of the caller's notifications are unread — the bell badge.
-	 */
-	long unreadCount(String callerId, Role callerRole);
 }
