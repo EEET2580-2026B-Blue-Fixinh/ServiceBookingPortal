@@ -92,12 +92,25 @@ public class SbpProperties {
 	/**
 	 * Req 4.S2/4.M1/4.M3: Booking/Technician/Staff data is normally owned by SMP. {@code mode}
 	 * switches which {@code Smp*Client} beans are wired: "mock" serves local fixtures so SBP
-	 * runs standalone, "live" calls the real SMP API once it exists.
+	 * runs standalone, "live" calls the real SMP API once it exists. Staff are the exception
+	 * and follow {@link #staffMode} instead.
 	 */
 	@Getter
 	@Setter
 	public static class Smp {
 		private String mode = "mock";
+
+		/**
+		 * Which {@code SmpStaffClient} is wired, independently of {@link #mode}.
+		 *
+		 * <p>SMT's service serves bookings but publishes no staff API yet (API Documentation
+		 * §12.8 is still provisional). Tying staff to {@code mode} meant that the moment SBP
+		 * talked to the real SMP, creating a receptionist or technician failed outright — and
+		 * with it the welcome email of Req 3.1.S5. So staff stay on the mock by default until
+		 * SMT ships staff endpoints; then this becomes {@code live}.
+		 */
+		private String staffMode = "mock";
+
 		private String baseUrl;
 		private String webhookSharedSecret;
 
@@ -114,7 +127,7 @@ public class SbpProperties {
 	 * Req 3.1.S5, API Doc §10.6: the welcome email a new staff member receives.
 	 *
 	 * <p><b>Policy only.</b> The SMTP transport — host, port, credential, TLS — is Spring
-	 * Boot's own {@code spring.mail.*} namespace and is set by the {@code integration}
+	 * Boot's own {@code spring.mail.*} namespace and is set by the {@code smtp}
 	 * profile alone. Splitting the two keeps the provider credential out of the file
 	 * everyone reads, and leaves Boot's autoconfiguration owning what it already owns.
 	 */
@@ -174,6 +187,11 @@ public class SbpProperties {
 			 * The first wait after a failure. Each subsequent wait doubles, so the default gives
 			 * attempts at roughly 0, 2, 6, 14 and 30 minutes — long enough to ride out a provider
 			 * blip without hammering one that is genuinely down.
+			 *
+			 * <p>Also how long a row that has never been attempted is left alone, on the
+			 * assumption that the request which wrote it is still sending. Keep it well above
+			 * the SMTP timeouts, or the sweeper can resend a welcome email whose first send has
+			 * not finished.
 			 */
 			private Duration baseDelay = Duration.ofMinutes(2);
 

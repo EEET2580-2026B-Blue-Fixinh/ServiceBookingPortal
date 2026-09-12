@@ -16,18 +16,26 @@ import com.fixinh.sbp.common.smp.client.mock.MockSmpStaffClient;
 
 import tools.jackson.databind.ObjectMapper;
 
-/** Wires whichever {@code Smp*Client} beans match {@code fixinh.sbp.smp.mode} (Req 4.S2). */
+/**
+ * Wires whichever {@code Smp*Client} beans match the configured modes (Req 4.S2): bookings by
+ * {@code fixinh.sbp.smp.mode}, staff by {@code fixinh.sbp.smp.staff-mode}.
+ */
 @Configuration
 public class SmpClientConfig {
 
+	/**
+	 * Staff are keyed to {@code staff-mode}, not {@code mode}. SMT publishes no staff API yet, so
+	 * the mock has to stand in even when bookings are live — see {@code SbpProperties.Smp}.
+	 */
 	@Bean
-	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "mode", havingValue = "mock", matchIfMissing = true)
+	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "staff-mode", havingValue = "mock",
+			matchIfMissing = true)
 	public SmpStaffClient mockSmpStaffClient(ObjectMapper objectMapper) {
 		return new MockSmpStaffClient(objectMapper);
 	}
 
 	@Bean
-	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "mode", havingValue = "live")
+	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "staff-mode", havingValue = "live")
 	public SmpStaffClient liveSmpStaffClient() {
 		return new LiveSmpStaffClient();
 	}

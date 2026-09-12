@@ -2,6 +2,13 @@ package com.fixinh.sbp.common.sharding;
 
 import java.util.Optional;
 
+/**
+ * Where each subject's data lives — the CDM's Shard Directory, behind an interface.
+ *
+ * <p>What lets the notification module route a staff member it holds no record of: SMP owns
+ * staff, so SBP keeps only an identifier and the store it belongs to (see
+ * {@link ShardDirectoryEntry}).
+ */
 public interface ShardDirectoryRepository {
 
 	/**

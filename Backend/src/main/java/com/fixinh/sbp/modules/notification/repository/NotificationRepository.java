@@ -41,10 +41,18 @@ public interface NotificationRepository {
 	 * precisely the state a human is supposed to notice. The sweeper reads the cap and marks
 	 * them.
 	 *
-	 * <p>Rows never attempted sort first, because their {@code lastAttemptAt} is null. That is
-	 * the right order: those are the ones a crash caught mid-send.
+	 * <p>Rows never attempted sort first, because their {@code lastAttemptAt} is null. Some of
+	 * those were left behind by a crash and have waited longest for any attempt, which is why
+	 * first is right. The rest are still being sent by the request that wrote them; the sweeper
+	 * leaves those alone until they are old enough to have been abandoned.
+	 *
+	 * <p><b>One store being down does not empty the answer.</b> Its rows are skipped for this
+	 * call and the failure is logged; the other store's rows still come back, so a regional
+	 * outage delays that region's emails and nobody else's.
 	 *
 	 * @param limit how many to take <b>from each store</b>, so at most twice this comes back
+	 * @throws IllegalStateException when neither store answered, so a sweep that could see
+	 *         nothing fails loudly instead of reporting an empty backlog
 	 */
 	List<Notification> findOutstandingEmails(int limit);
 

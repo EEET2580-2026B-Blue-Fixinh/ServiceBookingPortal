@@ -1,6 +1,8 @@
 package com.fixinh.sbp.common.email;
 
 /**
+ * Sends one email on SBP's behalf — today, the staff welcome email of Req 3.1.S5.
+ *
  * <p>Two implementations, chosen by {@code fixinh.sbp.email.mode} and never by the caller:
  * <ul>
  *   <li>{@code file} — writes the message to disk and sends nothing. The default, and what the

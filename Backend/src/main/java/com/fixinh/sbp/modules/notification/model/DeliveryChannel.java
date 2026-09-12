@@ -1,7 +1,7 @@
 package com.fixinh.sbp.modules.notification.model;
 
 /**
- * How a notification reaches its recipient 
+ * How a notification reaches its recipient.
  */
 public enum DeliveryChannel {
 

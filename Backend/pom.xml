@@ -39,8 +39,8 @@
 			<artifactId>spring-boot-starter-data-mongodb</artifactId>
 		</dependency>
 		<!-- Email delivery for staff account creation (Req 3.1.S5, API Doc §10.6).
-		     Supplies JavaMailSender; the transport itself is configured under
-		     spring.mail.* by the integration profile, never in application.yml. -->
+		     Supplies JavaMailSender; the provider host and credential come from
+		     the smtp profile and the environment, never from application.yml. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>

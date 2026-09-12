@@ -9,7 +9,13 @@ import org.springframework.stereotype.Repository;
 
 import lombok.extern.slf4j.Slf4j;
 
-
+/**
+ * The Shard Directory kept as two copies, one in each store, and read from whichever answers
+ * first — so resolving a region never needs a cross-shard hop.
+ *
+ * <p>A write counts once either copy accepts it, because a lookup asks both. Only when
+ * neither does is the subject unroutable, and that is the one case that throws.
+ */
 @Repository
 @Slf4j
 public class ReplicatedShardDirectoryRepository implements ShardDirectoryRepository {

@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.notification.dto.internal;
 
 /**
  * What the admin module hands the notification module once SMP confirms a staff account
+ * (API Documentation §10.6).
  *
  * @param staffId        SMP's identifier, used as the notification's recipient and as the
  *                       Shard Directory subject

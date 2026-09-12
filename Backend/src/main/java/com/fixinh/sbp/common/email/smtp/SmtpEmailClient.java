@@ -24,9 +24,10 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Sends through the provider configured under {@code spring.mail.*} (Req 3.1.S5).
  *
- * <p>Active only when {@code fixinh.sbp.email.mode} is {@code smtp}, which today means the
- * {@code integration} profile or a deliberate per-run override. The {@code dev} profile is
- * pinned to {@code file} and never reaches this class.
+ * <p>Active only when {@code fixinh.sbp.email.mode} is {@code smtp}, which means the
+ * {@code smtp} profile is active: stacked on {@code dev} by name for a real send from a
+ * development machine, or brought in by {@code integration} through its profile group. The
+ * {@code dev} profile on its own is pinned to {@code file} and never reaches this class.
  *
  * <p>Everything provider-specific stops here. The Notification module sees
  * {@link EmailClient#send} and {@link EmailDeliveryException}, and never learns that Jakarta

@@ -33,4 +33,17 @@ public record EmailMessage(String to, String subject, String body) {
 		}
 		Objects.requireNonNull(body, "Email body must not be null.");
 	}
+
+	/**
+	 * <b>Withholds the body.</b> A record's generated {@code toString()} prints every component,
+	 * and a welcome email's body carries an initial password — so one log line, or one failing
+	 * Mockito verification printing its arguments, would show that password in full. The third
+	 * record carrying it gets the same fix as {@code StaffWelcomeEmailCommand} and
+	 * {@code SmpStaffDto}: impossible to print, rather than merely discouraged.
+	 */
+	@Override
+	public String toString() {
+		return "EmailMessage[to=%s, subject=%s, body=<%d characters withheld>]"
+				.formatted(to, subject, body.length());
+	}
 }

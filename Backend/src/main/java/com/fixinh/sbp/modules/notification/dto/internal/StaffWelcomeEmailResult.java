@@ -1,7 +1,7 @@
 package com.fixinh.sbp.modules.notification.dto.internal;
 
 /**
- * What the notification module reports back after trying to send a welcome email
+ * What the notification module reports back after trying to send a welcome email.
  *
  * @param notificationId the row that records the attempt, whichever way it went. Always
  *                       present: the {@code Notification} is written before the provider is

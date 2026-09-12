@@ -1,0 +1,33 @@
+# Req 3.1.S5, API Doc section 10.6: the one profile that makes the welcome email
+# leave the machine.
+#
+# It stacks on whatever else is active. SPRING_PROFILES_ACTIVE=dev,smtp sends for
+# real from a development machine - later profiles win, so this mode overrides
+# dev's file pin - and the integration profile pulls it in through the group in
+# application.yml. Either way sending is opted into by name, never fallen into:
+# dev on its own still writes to target/mail.
+fixinh:
+  sbp:
+    email:
+      mode: smtp
+
+# Provider transport, bound by Spring Boot's own MailProperties - which is why it
+# sits under spring.mail rather than fixinh.sbp.
+#
+# The four variables have no defaults. A missing one fails startup with its name,
+# which beats booting happily and learning weeks later that no staff member ever
+# received a welcome email. The credential exists only in the environment.
+#
+# The socket timeouts live in application.yml, not here: they are not secrets, and
+# Spring Boot merges that spring.mail.properties map with the one below.
+spring:
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      # Gmail, and most providers on port 587, will not authenticate until the
+      # connection has been upgraded with STARTTLS. Mailtrap's sandbox accepts it too.
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true

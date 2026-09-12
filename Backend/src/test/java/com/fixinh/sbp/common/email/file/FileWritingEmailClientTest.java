@@ -53,13 +53,16 @@ class FileWritingEmailClientTest {
 
 	@Test
 	void keepsVietnameseCharactersIntact(@TempDir Path tempDir) throws IOException {
+		// "Xin chào Nguyễn Minh Tuấn", escaped so the test cannot depend on how this file was
+		// saved. The earlier plain-ASCII version passed whatever the client did to the text.
+		String greeting = "Xin ch\u00e0o Nguy\u1ec5n Minh Tu\u1ea5n";
+
 		Path outbox = tempDir.resolve("mail");
-		clientWritingTo(outbox).send(new EmailMessage(
-				"tuan@fixinh.vn", "Chao mung", "Xin chao Nguyen Minh Tuan"));
+		clientWritingTo(outbox).send(new EmailMessage("tuan@fixinh.vn", "Chao mung", greeting));
 
 		try (var files = Files.list(outbox)) {
 			String content = Files.readString(files.toList().get(0), StandardCharsets.UTF_8);
-			assertTrue(content.contains("Nguyen Minh Tuan"));
+			assertTrue(content.contains(greeting), "read back as UTF-8, every diacritic survives");
 		}
 	}
 

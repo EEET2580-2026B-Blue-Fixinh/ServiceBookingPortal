@@ -4,12 +4,12 @@ import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationListDto;
 
 /**
- * What the notification module's controller may call 
+ * What the notification module's controller may call.
  */
 public interface NotificationExternalService {
 
 	/**
-	 * One page of the caller's notifications, newest first 
+	 * One page of the caller's notifications, newest first (§9.1).
 	 *
 	 * @param unreadOnly null is false — §9.1's stated default
 	 * @param page null is the first page; negative is clamped to it
