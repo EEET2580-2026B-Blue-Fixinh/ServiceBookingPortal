@@ -33,6 +33,7 @@ public class ShardedNotificationRepository implements NotificationRepository {
 	private static final String FIELD_RECIPIENT_IDENTIFIER = "recipientIdentifier";
 	private static final String FIELD_READ_STATUS = "readStatus";
 	private static final String FIELD_CREATED_AT = "createdAt";
+	private static final String FIELD_SOURCE_EVENT_ID = "sourceEventId";
 
 	private final MongoTemplate south;
 	private final MongoTemplate north;
@@ -189,6 +190,23 @@ public class ShardedNotificationRepository implements NotificationRepository {
 		return templateFor(region)
 				.updateMulti(query, Update.update(FIELD_READ_STATUS, true), Notification.class)
 				.getModifiedCount();
+	}
+
+	@Override
+	public Optional<Notification> findBySourceEventId(Region region, String sourceEventId) {
+		if (region == null) {
+			throw new IllegalStateException(
+					"No region was resolved, so there is no store to look the event up in.");
+		}
+		if (sourceEventId == null || sourceEventId.isBlank()) {
+			return Optional.empty();
+		}
+
+		// One store, not two: the recipient's region is known, and an event's notification
+		// can only ever have been filed there. The sparse unique index on this field makes the
+		// read an index lookup rather than a scan.
+		Query query = Query.query(Criteria.where(FIELD_SOURCE_EVENT_ID).is(sourceEventId));
+		return Optional.ofNullable(templateFor(region).findOne(query, Notification.class));
 	}
 
 	/**

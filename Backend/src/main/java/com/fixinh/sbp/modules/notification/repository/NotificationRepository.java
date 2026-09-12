@@ -95,4 +95,21 @@ public interface NotificationRepository {
 	 *         read — and not an error
 	 */
 	long markAllRead(Region region, RecipientType recipientType, String recipientIdentifier);
+
+	// --- Replay handling -----------------------------------------------------
+	// Asked on behalf of an inbound SMP event rather than a signed-in caller, but it names a
+	// region for the same reason the methods above do: an event concerns one recipient, whose
+	// store has been resolved by the time this is asked, so a replay can only ever have been
+	// filed in that one place.
+
+	/**
+	 * The notification already raised from an SMP event, if one was (Req 3.3.U2, §11.7).
+	 *
+	 * @return empty when no notification carries this event id — the ordinary answer on a first
+	 *         delivery — or when the id is blank, which can match nothing
+	 * @throws IllegalStateException when the region is not set, for the same reason
+	 *         {@link #save} refuses: a lookup in a guessed store finds nothing and reads
+	 *         exactly like a first delivery, which is the one answer a replay must never get
+	 */
+	Optional<Notification> findBySourceEventId(Region region, String sourceEventId);
 }

@@ -125,6 +125,21 @@ public enum ErrorCode {
 
 	NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "No notification exists with this id."),
 
+	// --- Top-level: integration (Req 4.M2, 4.M3; API Documentation §11) ---
+	/**
+	 * Every way of not being SMP on an /integration path -- no header, not a bearer, the
+	 * wrong value -- gets this one answer, so the response cannot be used to tell them apart.
+	 */
+	INTEGRATION_FORBIDDEN(HttpStatus.FORBIDDEN,
+			"Only the Service Management Portal may call this endpoint."),
+	/**
+	 * §11.7: a required field is missing or unusable. SMP should not retry the same payload;
+	 * unlike a 5xx, nothing about waiting will make it acceptable.
+	 */
+	EVENT_MALFORMED(HttpStatus.BAD_REQUEST,
+			"The booking event is missing a required field or carries a value SBP does not "
+					+ "recognise. Correct the payload before sending it again."),
+
 	// --- Field-level: password (Req 3.1.M1) ---
 	PASSWORD_TOO_SHORT(HttpStatus.BAD_REQUEST,
 			"Password must be at least 8 characters.", "Fixinh@2026"),

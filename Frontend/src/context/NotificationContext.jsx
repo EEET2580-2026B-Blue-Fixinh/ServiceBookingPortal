@@ -253,9 +253,14 @@ export function NotificationProvider({ children }) {
       if (next === before) return
 
       applyData(next)
-      showToast(toastFor(pushed))
+      // markRead on open, so the badge behaves the same whether the customer
+      // reached the booking through the toast or through the bell.
+      showToast({
+        ...toastFor(pushed),
+        onOpen: () => markRead(pushed.notificationId),
+      })
     },
-    [applyData, showToast],
+    [applyData, markRead, showToast],
   )
 
   // Customers only. An administrator's session would be accepted by the backend

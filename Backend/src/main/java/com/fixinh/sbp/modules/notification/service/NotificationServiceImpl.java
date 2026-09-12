@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import com.fixinh.sbp.common.dto.PageResponse;
@@ -16,6 +17,7 @@ import com.fixinh.sbp.common.security.Role;
 import com.fixinh.sbp.common.sharding.Region;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationListDto;
+import com.fixinh.sbp.modules.notification.dto.external.NotificationPushDto;
 import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
@@ -27,6 +29,7 @@ import com.fixinh.sbp.modules.notification.model.Notification;
 import com.fixinh.sbp.modules.notification.model.NotificationType;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
 import com.fixinh.sbp.modules.notification.repository.NotificationRepository;
+import com.fixinh.sbp.modules.notification.websocket.NotificationGateway;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +46,7 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 	private final NotificationRegionResolver regionResolver;
 	private final NotificationRepository notificationRepository;
 	private final EmailClient emailClient;
+	private final NotificationGateway gateway;
 
 	/**
 	 * <b>Write, then send, then write again.</b> The first write lands before the provider is
@@ -86,33 +90,104 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 
 	// --- Raising an in-app one, for other modules -----------------------------
 
+	// --- Raising one, for Integration and Admin -------------------------------
+
+	/**
+	 * <b>Look, write, push</b> — and the push only after the write has returned, because §9's
+	 * promise that a notification survives a customer being offline is only true of a row that
+	 * exists before anyone tries to reach them.
+	 */
 	@Override
 	public NotificationDto raise(NotificationCreateCommand command) {
 		Region region = storeFor(command);
+
+		// A replayed SMP event finds the notification it already produced and stops here: no
+		// second row, no second push. Only a command that names its event can be a replay.
+		Optional<Notification> earlier = raisedEarlier(region, command);
+		if (earlier.isPresent()) {
+			return replay(earlier.get(), command);
+		}
+
+		Notification saved;
+		try {
+			saved = notificationRepository.save(inAppNotification(command, region));
+		}
+		catch (DuplicateKeyException ex) {
+			// Two replays of one event arrived together, both looked and found nothing, and
+			// the sparse unique index let only one of them write. This is the other one, and
+			// its outcome already exists -- it has been pushed by the winner, so it is not
+			// pushed again here.
+			Notification winner = raisedEarlier(region, command).orElseThrow(() -> ex);
+			return replay(winner, command);
+		}
+
+		if (deliveredLive(saved)) {
+			gateway.push(saved.getRecipientIdentifier(), NotificationPushDto.from(saved));
+		}
+
+		log.debug("Raised {} notification {} for {} {}", command.type(), saved.getId(),
+				command.recipientType(), command.recipientIdentifier());
+
+		return NotificationDto.from(saved);
+	}
+
+	/**
+	 * The notification this command's event already produced, if the command names an event
+	 * and it has been seen. Empty for a command from no event: nothing to look up, so nothing
+	 * to find.
+	 */
+	private Optional<Notification> raisedEarlier(Region region, NotificationCreateCommand command) {
+		if (command.sourceEventId() == null) {
+			return Optional.empty();
+		}
+		return notificationRepository.findBySourceEventId(region, command.sourceEventId());
+	}
+
+	/** The answer to a repeated event: what the first delivery produced, and nothing more. */
+	private NotificationDto replay(Notification existing, NotificationCreateCommand command) {
+		log.info("Event {} already raised notification {}; the replay changes nothing",
+				command.sourceEventId(), existing.getId());
+		return NotificationDto.from(existing);
+	}
+
+	/**
+	 * Whether a notification goes over the real-time channel the moment it is saved (§9.3).
+	 *
+	 * <p>The type carries the decision; the recipient check is the belt to its braces. Only a
+	 * customer has an SBP session to push to, and {@code convertAndSendToUser} resolving a
+	 * staff id would simply find no session -- harmless, but a push that can never land is
+	 * not worth attempting.
+	 */
+	private boolean deliveredLive(Notification notification) {
+		return notification.getType().isPushedLive()
+				&& notification.getRecipientType() == RecipientType.CUSTOMER;
+	}
+
+	/**
+	 * The row for a notification whose delivery is the write itself.
+	 *
+	 * <p>IN_APP and SENT are fixed here rather than taken from the command: there is no
+	 * provider to accept it, nothing for the retry sweeper to do, and no address or rendered
+	 * body that a resend would need. An EMAIL record raised this way would be abandoned on
+	 * the sweeper's first pass for lacking exactly those.
+	 */
+	private Notification inAppNotification(NotificationCreateCommand command, Region region) {
 		Instant now = Instant.now();
 
-		// IN_APP and SENT are fixed here rather than taken from the command. Writing the row
-		// is the delivery: there is no provider to accept it, nothing for the retry sweeper to
-		// do, and no address or rendered body that a resend would need. An EMAIL record raised
-		// this way would be abandoned on the sweeper's first pass for lacking exactly those.
-		Notification saved = notificationRepository.save(Notification.builder()
+		return Notification.builder()
 				.recipientType(command.recipientType())
 				.recipientIdentifier(command.recipientIdentifier())
 				.type(command.type())
 				.deliveryChannel(DeliveryChannel.IN_APP)
 				.message(command.message())
 				.bookingRef(command.bookingRef())
+				.sourceEventId(command.sourceEventId())
 				.readStatus(false)
 				.createdAt(now)
 				.deliveryStatus(DeliveryStatus.SENT)
 				.sentAt(now)
 				.homeRegion(region)
-				.build());
-
-		log.debug("Raised {} notification {} for {} {}", command.type(), saved.getId(),
-				command.recipientType(), command.recipientIdentifier());
-
-		return NotificationDto.from(saved);
+				.build();
 	}
 
 	/**

@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.notification.repository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -214,6 +216,52 @@ class ShardedNotificationRepositoryTest {
 				.thenThrow(new DataAccessResourceFailureException("north unreachable"));
 
 		assertThrows(IllegalStateException.class, () -> repository.findOutstandingEmails(50));
+	// --- Replay handling: one notification per SMP event -------------------------------------
+
+	@Test
+	void looksAnEventUpInTheRecipientsStoreOnly() {
+		Notification filed = new Notification();
+		when(north.findOne(any(Query.class), eq(Notification.class))).thenReturn(filed);
+
+		Optional<Notification> found = repository.findBySourceEventId(Region.NORTH, "evt-8f2c14a9");
+
+		assertSame(filed, found.orElseThrow());
+		verify(north).findOne(any(Query.class), eq(Notification.class));
+		verifyNoInteractions(south);
+	}
+
+	@Test
+	void asksForExactlyThatEvent() {
+		when(south.findOne(any(Query.class), eq(Notification.class))).thenReturn(null);
+
+		assertTrue(repository.findBySourceEventId(Region.SOUTH, "evt-8f2c14a9").isEmpty(),
+				"nothing filed for this event yet is the ordinary first-delivery answer");
+
+		ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+		verify(south).findOne(captor.capture(), eq(Notification.class));
+
+		String query = captor.getValue().toString();
+		assertTrue(query.contains("sourceEventId"), "the field the sparse unique index is on");
+		assertTrue(query.contains("evt-8f2c14a9"));
+	}
+
+	@Test
+	void answersEmptyForABlankEventIdWithoutAskingAStore() {
+		// A blank id can match nothing, so there is nothing to ask. Same rule as findById.
+		assertTrue(repository.findBySourceEventId(Region.SOUTH, "  ").isEmpty());
+		assertTrue(repository.findBySourceEventId(Region.SOUTH, null).isEmpty());
+
+		verifyNoInteractions(south, north);
+	}
+
+	@Test
+	void refusesToLookAnEventUpInAGuessedStore() {
+		// An empty answer from the wrong store reads exactly like a first delivery, and a
+		// first delivery is the one thing a replay must never be mistaken for.
+		assertThrows(IllegalStateException.class,
+				() -> repository.findBySourceEventId(null, "evt-8f2c14a9"));
+
+		verifyNoInteractions(south, north);
 	}
 
 	// --- Refusing rather than defaulting ----------------------------------------------------

@@ -99,6 +99,10 @@ fixinh:
       # The bearer token SMT expects on every call. Their development default;
       # a real one belongs in the environment, never in this file.
       service-token: ${SMP_SERVICE_TOKEN:local-integration-token}
+      # The mirror image: the bearer SMP presents on every call to /integration (Req 4.M2,
+      # API Doc §11.1), checked by IntegrationAuthenticationFilter with a constant-time
+      # compare. Blank refuses every integration call rather than admitting them all. The
+      # default is for a single-PC dev setup; the real value belongs in the environment.
       webhook-shared-secret: ${SMP_WEBHOOK_SECRET:dev-only-shared-secret}
 
     cors:
@@ -196,4 +200,3 @@ management:
   health:
     mongodb:
       enabled: false
-      

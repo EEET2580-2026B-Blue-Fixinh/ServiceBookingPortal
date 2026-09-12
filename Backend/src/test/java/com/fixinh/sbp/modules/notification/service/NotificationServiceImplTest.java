@@ -13,6 +13,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -27,6 +28,9 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.dao.DuplicateKeyException;
 
 import com.fixinh.sbp.common.config.SbpProperties;
 import com.fixinh.sbp.common.email.EmailClient;
@@ -42,6 +46,7 @@ import com.fixinh.sbp.common.sharding.SubjectType;
 import com.fixinh.sbp.modules.customer.interfaces.external.CustomerExternalService;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationDto;
 import com.fixinh.sbp.modules.notification.dto.external.NotificationListDto;
+import com.fixinh.sbp.modules.notification.dto.external.NotificationPushDto;
 import com.fixinh.sbp.modules.notification.dto.internal.NotificationCreateCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailCommand;
 import com.fixinh.sbp.modules.notification.dto.internal.StaffWelcomeEmailResult;
@@ -51,6 +56,7 @@ import com.fixinh.sbp.modules.notification.model.Notification;
 import com.fixinh.sbp.modules.notification.model.NotificationType;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
 import com.fixinh.sbp.modules.notification.repository.NotificationRepository;
+import com.fixinh.sbp.modules.notification.websocket.NotificationGateway;
 
 /**
  * The send path, with the provider and the database mocked and everything else real.
@@ -72,6 +78,7 @@ class NotificationServiceImplTest {
 	private EmailClient emailClient;
 	private ShardDirectoryRepository shardDirectory;
 	private NotificationRepository repository;
+	private NotificationGateway gateway;
 	private NotificationServiceImpl service;
 
 	@BeforeEach
@@ -90,6 +97,7 @@ class NotificationServiceImplTest {
 				.thenReturn(Optional.of(Region.SOUTH));
 
 		repository = mock(NotificationRepository.class);
+		gateway = mock(NotificationGateway.class);
 		when(repository.save(any())).thenAnswer(invocation -> {
 			Notification given = invocation.getArgument(0);
 			if (given.getId() == null) {
@@ -111,7 +119,8 @@ class NotificationServiceImplTest {
 				new NotificationRegionResolver(
 						shardDirectory, new RegionResolver(), mock(CustomerExternalService.class)),
 				repository,
-				emailClient);
+				emailClient,
+				gateway);
 	}
 
 	@Test
@@ -411,9 +420,132 @@ class NotificationServiceImplTest {
 		service.raise(command);
 		service.raise(command);
 
-		// Not idempotent, deliberately. §11.7 gives SMP an eventId so Integration can filter
-		// replays; this module cannot tell one from a genuine second change to the booking.
+		// Not idempotent, deliberately: this command names no event, so there is nothing to
+		// recognise a repeat by, and a second call is a genuine second notification. Naming
+		// the event is what turns the same call into a replay -- see the section below.
 		assertEquals(2, saves.size());
+		verify(repository, never()).findBySourceEventId(any(), any());
+	}
+
+	// --- Req 3.3.U2, §9.3: delivered live, once per event -------------------------------------
+
+	private static final String EVENT_ID = "evt-8f2c14a9";
+
+	private NotificationCreateCommand scheduledByEvent() {
+		return NotificationCreateCommand.forBookingEvent(EVENT_ID, CUSTOMER_ID,
+				NotificationType.BOOKING_SCHEDULED,
+				"Your order ORD-2026-1024 is scheduled for 24 Aug 2026, 18:00-20:00.",
+				"ORD-2026-1024");
+	}
+
+	@Test
+	void pushesABookingNotificationOnlyAfterItIsSaved() {
+		service.raise(scheduledByEvent());
+
+		// The order is the contract (§9): a push before the write would let a customer who
+		// taps the toast find nothing behind it if the write then failed.
+		InOrder saveThenPush = inOrder(repository, gateway);
+		saveThenPush.verify(repository).save(any());
+		saveThenPush.verify(gateway).push(eq(CUSTOMER_ID), any(NotificationPushDto.class));
+	}
+
+	@Test
+	void pushesTheSavedRowNotTheCommand() {
+		service.raise(scheduledByEvent());
+
+		ArgumentCaptor<NotificationPushDto> pushed = ArgumentCaptor.forClass(NotificationPushDto.class);
+		verify(gateway).push(eq(CUSTOMER_ID), pushed.capture());
+
+		Notification written = saves.get(0);
+		assertEquals(written.getId(), pushed.getValue().notificationId(),
+				"the client marks this id read through §9.2, so it has to be the stored one");
+		assertEquals(NotificationType.BOOKING_SCHEDULED, pushed.getValue().type());
+		assertEquals(written.getMessage(), pushed.getValue().message());
+		assertEquals("ORD-2026-1024", pushed.getValue().bookingRef());
+		assertEquals(written.getCreatedAt(), pushed.getValue().createdAt());
+	}
+
+	@Test
+	void writesTheEventIdOntoTheNotification() {
+		service.raise(scheduledByEvent());
+
+		assertEquals(EVENT_ID, saves.get(0).getSourceEventId(),
+				"without this on the row there is nothing for a replay to find");
+	}
+
+	@Test
+	void aNotificationFromNoEventIsPushedButCarriesNoEventId() {
+		service.raise(NotificationCreateCommand.forCustomerBooking(
+				CUSTOMER_ID, NotificationType.BOOKING_CONFIRMED, "Confirmed.", "ORD-1"));
+
+		verify(gateway).push(eq(CUSTOMER_ID), any(NotificationPushDto.class));
+		assertNull(saves.get(0).getSourceEventId());
+	}
+
+	@Test
+	void theSameEventRaisesOneNotificationAndOnePush() {
+		// The repository answers from what has been saved, as the real one would.
+		when(repository.findBySourceEventId(eq(Region.SOUTH), eq(EVENT_ID))).thenAnswer(
+				invocation -> saves.stream()
+						.filter(saved -> EVENT_ID.equals(saved.getSourceEventId()))
+						.findFirst());
+
+		NotificationDto first = service.raise(scheduledByEvent());
+		NotificationDto replay = service.raise(scheduledByEvent());
+
+		assertEquals(1, saves.size(), "a replay writes nothing");
+		verify(gateway, times(1)).push(eq(CUSTOMER_ID), any(NotificationPushDto.class));
+		assertEquals(first.notificationId(), replay.notificationId(),
+				"the replay is answered with what the first delivery produced");
+	}
+
+	@Test
+	void aLostRaceReturnsTheWinnerWithoutASecondPush() {
+		// Both replays looked and found nothing; the index let one write. The one under test
+		// is the loser: its save is refused, and the winner is what it finds on re-reading.
+		Notification winner = inApp("NOTIF-WINNER", false);
+		winner.setSourceEventId(EVENT_ID);
+		doThrow(new DuplicateKeyException("sourceEventId")).when(repository).save(any());
+		when(repository.findBySourceEventId(eq(Region.SOUTH), eq(EVENT_ID)))
+				.thenReturn(Optional.empty())
+				.thenReturn(Optional.of(winner));
+
+		NotificationDto answer = service.raise(scheduledByEvent());
+
+		assertEquals("NOTIF-WINNER", answer.notificationId());
+		verifyNoInteractions(gateway);
+	}
+
+	@Test
+	void aDuplicateKeyFromSomethingElseIsNotSwallowed() {
+		// No event id means no replay to fall back to. Whatever this collision was, it is
+		// not one this guard understands, and hiding it would hide a real fault.
+		doThrow(new DuplicateKeyException("something else")).when(repository).save(any());
+
+		assertThrows(DuplicateKeyException.class, () -> service.raise(
+				NotificationCreateCommand.forCustomerBooking(
+						CUSTOMER_ID, NotificationType.BOOKING_CONFIRMED, "Confirmed.", "ORD-1")));
+
+		verifyNoInteractions(gateway);
+	}
+
+	@Test
+	void neverPushesAStaffNotification() {
+		service.raise(new NotificationCreateCommand(RecipientType.STAFF, "STF-001", "HCM",
+				NotificationType.STAFF_ACCOUNT_CREATED, "Welcome email sent to tuan@fixinh.vn",
+				null));
+
+		assertEquals(1, saves.size(), "still recorded -- it is the push that is withheld");
+		verifyNoInteractions(gateway);
+	}
+
+	@Test
+	void theWelcomeEmailIsNeverPushed() {
+		service.sendStaffWelcomeEmail(COMMAND);
+
+		// §9.3 pushes the two booking types and nothing else, and a staff member has no SBP
+		// session to reach in any case.
+		verifyNoInteractions(gateway);
 	}
 
 	/** An in-app notification for the customer under test, as the repository would return it. */
@@ -442,6 +574,7 @@ class NotificationServiceImplTest {
 		copy.setDeliveryChannel(source.getDeliveryChannel());
 		copy.setMessage(source.getMessage());
 		copy.setBookingRef(source.getBookingRef());
+		copy.setSourceEventId(source.getSourceEventId());
 		copy.setCreatedAt(source.getCreatedAt());
 		copy.setReadStatus(source.isReadStatus());
 		copy.setDeliveryStatus(source.getDeliveryStatus());

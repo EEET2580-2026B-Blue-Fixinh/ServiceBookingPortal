@@ -12,6 +12,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import com.fixinh.sbp.common.security.JsonAuthenticationEntryPoint;
+import com.fixinh.sbp.common.security.integration.IntegrationAuthenticationFilter;
 import com.fixinh.sbp.common.security.jwt.JwtAuthenticationFilter;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class SecurityConfig {
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+	private final IntegrationAuthenticationFilter integrationAuthenticationFilter;
 	private final JsonAuthenticationEntryPoint authenticationEntryPoint;
 	private final CorsConfigurationSource corsConfigurationSource;
 
@@ -72,10 +74,21 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/ratings/**").hasRole("CUSTOMER")
 						.requestMatchers("/api/v1/notifications/**")
 						.hasAnyRole("CUSTOMER", "ADMIN")
+						// Req 4.M2, API Doc §11.1: only SMP reaches /integration, and it does so
+						// with the shared secret rather than a JWT. IntegrationAuthenticationFilter
+						// authenticates it and answers everything else with 403 before this
+						// matcher is consulted; the matcher is still here so that the rule is
+						// visible where every other path's rule is, and holds even if the
+						// filter's scope ever drifted.
+						.requestMatchers("/api/v1/integration/**").hasRole("SERVICE")
 						// Everything else is closed by default, so an endpoint added later is
 						// protected unless it is deliberately opened.
 						.anyRequest().authenticated())
-				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+				// Ahead of the JWT filter, though the two are scoped to disjoint paths and the
+				// order is not what keeps them apart -- IntegrationAuthenticationFilter.covers
+				// is. Listed first because it is the more restrictive of the two.
+				.addFilterBefore(integrationAuthenticationFilter, JwtAuthenticationFilter.class);
 
 		return http.build();
 	}
