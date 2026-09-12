@@ -2,6 +2,7 @@ package com.fixinh.sbp.modules.customer.interfaces.internal;
 
 import java.util.Optional;
 
+import com.fixinh.sbp.modules.customer.dto.external.CustomerProfileDto;
 import com.fixinh.sbp.modules.customer.dto.internal.CustomerCreateCommand;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.model.Customer;
@@ -35,4 +36,13 @@ public interface CustomerInternalService {
 	 * @return The home region determined by the address province
 	 */
 	void completeAddress(String customerId, CompleteAddressCommand command);
+
+	/**
+	 * The signed-in caller's own profile (GET /customers/me), combining this module's profile
+	 * with the credential's phone number and sign-in providers.
+	 *
+	 * @throws com.fixinh.sbp.common.exception.ApiException CUSTOMER_NOT_FOUND if no profile or
+	 *         no credential has this id
+	 */
+	CustomerProfileDto getMyProfile(String customerId);
 }

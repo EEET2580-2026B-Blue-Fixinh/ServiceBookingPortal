@@ -2,12 +2,14 @@ package com.fixinh.sbp.modules.customer.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fixinh.sbp.common.security.jwt.UserPrincipal;
+import com.fixinh.sbp.modules.customer.dto.external.CustomerProfileDto;
 import com.fixinh.sbp.modules.customer.dto.internal.CompleteAddressCommand;
 import com.fixinh.sbp.modules.customer.interfaces.internal.CustomerInternalService;
 
@@ -19,6 +21,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CustomerController {
 	private final CustomerInternalService customers;
+
+	/** The signed-in customer's own profile, for the account page. */
+	@GetMapping
+	public CustomerProfileDto getMyProfile(@AuthenticationPrincipal UserPrincipal principal) {
+		return customers.getMyProfile(principal.id());
+	}
 
 	@PutMapping("/address")
 	public ResponseEntity<Void> completeAddress(

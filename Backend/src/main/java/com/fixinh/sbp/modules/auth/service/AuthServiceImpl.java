@@ -342,6 +342,11 @@ public class AuthServiceImpl implements AuthExternalService, AuthInternalService
 		return credentialRepository.save(credential);
 	}
 
+	@Override
+	public Optional<UserCredential> findById(String id) {
+		return credentialRepository.findById(id);
+	}
+
 	/** One field takes both, so the server works out which was typed (see LoginCommand). */
 	private Optional<UserCredential> findCredential(String identifier) {
 		if (identifier == null || identifier.isBlank()) {
