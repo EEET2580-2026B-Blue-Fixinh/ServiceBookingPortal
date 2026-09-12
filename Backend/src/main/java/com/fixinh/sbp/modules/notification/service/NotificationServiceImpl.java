@@ -90,8 +90,6 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 
 	// --- Raising an in-app one, for other modules -----------------------------
 
-	// --- Raising one, for Integration and Admin -------------------------------
-
 	/**
 	 * <b>Look, write, push</b> — and the push only after the write has returned, because §9's
 	 * promise that a notification survives a customer being offline is only true of a row that

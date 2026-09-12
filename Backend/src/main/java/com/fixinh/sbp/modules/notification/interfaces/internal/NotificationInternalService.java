@@ -26,8 +26,7 @@ public interface NotificationInternalService {
 	StaffWelcomeEmailResult sendStaffWelcomeEmail(StaffWelcomeEmailCommand command);
 
 	/**
-	 * Records an in-app notification and returns it.
-	 * Records a notification, delivers it over the real-time channel when its type is one
+	 * Records an in-app notification, delivers it over the real-time channel when its type is one
 	 * §9.3 pushes, and returns it.
 	 *
 	 * <p><b>Saved first, delivered second (§9).</b> The write is the notification; the push is

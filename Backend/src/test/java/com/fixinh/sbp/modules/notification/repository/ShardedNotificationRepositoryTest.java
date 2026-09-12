@@ -216,6 +216,8 @@ class ShardedNotificationRepositoryTest {
 				.thenThrow(new DataAccessResourceFailureException("north unreachable"));
 
 		assertThrows(IllegalStateException.class, () -> repository.findOutstandingEmails(50));
+	}
+
 	// --- Replay handling: one notification per SMP event -------------------------------------
 
 	@Test

@@ -38,6 +38,7 @@ import com.fixinh.sbp.modules.notification.model.Notification;
 import com.fixinh.sbp.modules.notification.model.NotificationType;
 import com.fixinh.sbp.modules.notification.model.RecipientType;
 import com.fixinh.sbp.modules.notification.repository.NotificationRepository;
+import com.fixinh.sbp.modules.notification.websocket.NotificationGateway;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -183,7 +184,8 @@ class WelcomeEmailLoggingTest {
 				new NotificationRegionResolver(directory, new RegionResolver(),
 						mock(CustomerExternalService.class)),
 				repository,
-				new FileWritingEmailClient(properties));
+				new FileWritingEmailClient(properties),
+				mock(NotificationGateway.class));
 	}
 
 	/** A failed welcome email, well past its backoff, still holding the letter it owes. */

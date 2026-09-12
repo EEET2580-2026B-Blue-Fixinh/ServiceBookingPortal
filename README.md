@@ -27,11 +27,9 @@ Tailwind.
 | Admin | ✅ | ✅ | Customers: list, activate and deactivate. Staff: list, search, create, update — relayed to SMP, which is mocked (`SMP_STAFF_MODE`) |
 | Staff welcome email | ✅ | ✅ | Req 3.1.S5, §10.6: a letter on every staff creation, retried in the background. Written to `target/mail` on `dev`; sent for real with the `smtp` profile |
 | Ratings | WIP | WIP | Package scaffolding only |
-| Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. The channel is wired end to end; the events that raise a push (§11.7) are still to come |
-| SMP integration | WIP | — | Bookings: live client for the catalogue, creation and lookup, plus the mock. Staff: mock only — SMT publishes no staff API ([contract](docs/smp-staff-contract.md)) |
 | Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. A `CONFIRMED` or `SCHEDULED` booking event raises one; opening the toast or the bell row goes to the booking |
 | SMP integration — inbound | ✅ | — | §11.7 `POST /integration/booking-events`: shared-secret auth, replay handling by `eventId`, projection refresh, then the notification |
-| SMP integration — outbound | WIP | — | Bookings reach SMP synchronously on creation; the outbox that makes that durable is not written |
+| SMP integration — outbound | WIP | — | Bookings reach SMP synchronously on creation; the outbox that makes that durable is not written. Staff: mock only — SMT publishes no staff API ([contract](docs/smp-staff-contract.md)) |
 | Cloudinary image relay | WIP | WIP | Config bound, service not implemented |
 | Google OAuth | WIP | WIP | Properties bound only |
 
