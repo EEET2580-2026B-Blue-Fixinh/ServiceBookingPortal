@@ -28,6 +28,7 @@ export const ROUTES = {
   BOOKING_DETAIL: "/booking/:bookingRef",
   bookingDetail: (bookingRef) => `/booking/${encodeURIComponent(bookingRef)}`,
   RATINGS: "/ratings",
+  PROFILE: "/profile",
   ADMIN: "/admin",
   PROFILE_COMPLETION: "/profile/complete", // Address-based shard placement (Req 3.1.U1-U2)
 };

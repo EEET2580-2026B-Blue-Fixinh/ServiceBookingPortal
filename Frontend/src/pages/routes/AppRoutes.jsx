@@ -9,6 +9,7 @@ import { MyBookingsPage } from "../booking/MyBookingsPage";
 import { NewBookingPage } from "../booking/NewBookingPage";
 import { BookingDetailPage } from "../booking/BookingDetailPage";
 import { MyRatingsPage } from "../rating/MyRatingsPage";
+import { ProfilePage } from "../profile/ProfilePage";
 import { AdminCustomersPage } from "../admin/AdminCustomersPage";
 import { AdminStaffPage } from "../admin/AdminStaffPage";
 import { AdminHomePage } from "../admin/AdminHomePage";
@@ -37,6 +38,7 @@ export function AppRoutes() {
         <Route path={ROUTES.NEW_BOOKING} element={<NewBookingPage />} />
         <Route path={ROUTES.BOOKING_DETAIL} element={<BookingDetailPage />} />
         <Route path={ROUTES.RATINGS} element={<MyRatingsPage />} />
+        <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
       </Route>
 
       {/* Admins only. AdminRoute turns away a signed-in CUSTOMER as well as an

@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { key: 'bookings', label: 'My bookings', icon: 'list_alt', to: '/booking' },
   { key: 'new', label: 'New booking', icon: 'add_circle', to: '/booking/new' },
   { key: 'ratings', label: 'My ratings', icon: 'reviews', to: '/ratings' },
-  { key: 'profile', label: 'Profile', icon: 'account_circle' },
+  { key: 'profile', label: 'Profile', icon: 'account_circle', to: '/profile' },
 ]
 
 function getInitials(fullName) {
