@@ -60,6 +60,20 @@ public class Notification {
 	 */
 	private String bookingRef;
 
+	/**
+	 * The SMP event this was raised from — §11.7's {@code eventId} — or null for a
+	 * notification raised by anything else: an administrator's action, the staff welcome
+	 * email.
+	 *
+	 * <p>What makes a replay harmless. SMP resends an event it got no 2xx for, and the same
+	 * {@code eventId} arriving twice must produce one notification, not two. The service asks
+	 * for this before it writes, and a sparse unique index on it in each store closes the
+	 * window between the ask and the write. Sparse, so the nulls do not collide with one
+	 * another — a unique index that counted nulls would allow exactly one notification that
+	 * came from no event.
+	 */
+	private String sourceEventId;
+
 	/** §9.1 publishes this as {@code readStatus}. Meaningless for email; left false. */
 	private boolean readStatus;
 

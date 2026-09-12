@@ -20,6 +20,7 @@ import com.fixinh.sbp.modules.customer.model.Customer;
 import com.fixinh.sbp.modules.auth.model.UserCredential;
 import com.fixinh.sbp.modules.admin.model.Administrator;
 import com.fixinh.sbp.modules.booking.model.ServiceBooking;
+import com.fixinh.sbp.modules.integration.model.IntegrationEvent;
 import com.fixinh.sbp.modules.notification.model.Notification;
 import com.fixinh.sbp.modules.rating.model.Rating;
 
@@ -54,6 +55,8 @@ public class ShardIndexInitializer {
         ensureCredentialIndexes(north, Region.NORTH);
         ensureNotificationIndexes(south, Region.SOUTH);
         ensureNotificationIndexes(north, Region.NORTH);
+        ensureIntegrationEventIndexes(south, Region.SOUTH);
+        ensureIntegrationEventIndexes(north, Region.NORTH);
         ensureBookingIndexes(south, Region.SOUTH);
         ensureBookingIndexes(north, Region.NORTH);
         ensureRatingIndexes(south, Region.SOUTH);
@@ -247,6 +250,41 @@ public class ShardIndexInitializer {
     }
 
     /**
+     * How long a handled inbound event is remembered (Milestone 1: "a short retention
+     * window"). Long enough that any retry SMP is going to make has been made -- their retry
+     * is on 5xx and timeout, on the order of minutes -- and short enough that the collection
+     * does not grow with every booking ever changed.
+     *
+     * <p>Changing this value is not a redeploy. Mongo refuses to create a TTL index whose
+     * expiry differs from the one already there ({@code IndexOptionsConflict}, the same error
+     * the administrator index logs), so the existing index has to be dropped, or altered with
+     * {@code collMod}, before the new value takes.
+     */
+    private static final java.time.Duration INBOUND_EVENT_RETENTION = java.time.Duration.ofDays(7);
+
+    /**
+     * Inbound integration events (Req 4.M3, §11.7): the replay guard, and its own expiry.
+     */
+    private void ensureIntegrationEventIndexes(MongoTemplate template, Region region) {
+        try {
+            // Expires a handled event a week after it was handled. Only documents carrying a
+            // date in handledAt are eligible, which is what makes an unfinished event -- one
+            // whose listeners never returned -- immune: it stays until a replay completes it.
+            // The _id is the eventId, so replay lookup needs no index of its own.
+            template.indexOps(IntegrationEvent.class)
+                    .createIndex(new Index().on("handledAt", Sort.Direction.ASC)
+                            .expire(INBOUND_EVENT_RETENTION));
+
+            log.info("Integration event indexes ensured on {} shard ({})", region,
+                    template.getDb().getName());
+        }
+        catch (RuntimeException ex) {
+            log.warn("Could not ensure integration event indexes on {} shard - replays are "
+                    + "still recognised, but handled events will not expire", region, ex);
+        }
+    }
+
+    /**
      * Notification indexes (Req 3.1.S5, §9.1, §9.2).
      */
     private void ensureNotificationIndexes(MongoTemplate template, Region region) {
@@ -282,6 +320,16 @@ public class ShardIndexInitializer {
             indexes.createIndex(new Index()
                     .on("deliveryStatus", Sort.Direction.ASC)
                     .on("lastAttemptAt", Sort.Direction.ASC));
+
+            // One notification per SMP event (§11.7, Req 3.3.U2). The service looks the event
+            // up before it writes; this is what holds when two replays of the same event
+            // arrive together and both find nothing. Sparse, because everything not raised
+            // from an event carries no id here, and a unique index that counted nulls would
+            // permit exactly one such notification in each store.
+            indexes.createIndex(new Index()
+                    .on("sourceEventId", Sort.Direction.ASC)
+                    .unique()
+                    .sparse());
 
             log.info("Notification indexes ensured on {} shard ({})", region,
                     template.getDb().getName());

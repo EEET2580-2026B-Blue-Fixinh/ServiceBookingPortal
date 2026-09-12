@@ -26,8 +26,9 @@ Tailwind.
 | Customer profile | WIP | WIP | `GET`/`PUT /customers/me` not written |
 | Admin | WIP | WIP | Route guard only; no admin pages, no endpoints |
 | Ratings | WIP | WIP | Package scaffolding only |
-| Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. The channel is wired end to end; the events that raise a push (§11.7) are still to come |
-| SMP integration | WIP | — | Client interfaces exist; mock and live are both empty |
+| Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. A `CONFIRMED` or `SCHEDULED` booking event raises one; opening the toast or the bell row goes to the booking |
+| SMP integration — inbound | ✅ | — | §11.7 `POST /integration/booking-events`: shared-secret auth, replay handling by `eventId`, projection refresh, then the notification |
+| SMP integration — outbound | WIP | — | Bookings reach SMP synchronously on creation; the outbox that makes that durable is not written |
 | Cloudinary image relay | WIP | WIP | Config bound, service not implemented |
 | Google OAuth | WIP | WIP | Properties bound only |
 
@@ -43,6 +44,7 @@ a place to land without conflicting on package creation.
 | `GET` | `/api/v1/reference/provinces` | public |
 | `GET` | `/api/v1/notifications` | `CUSTOMER`, `ADMIN` — own notifications only |
 | `PATCH` | `/api/v1/notifications/{id}/read`, `/api/v1/notifications/read-all` | `CUSTOMER`, `ADMIN` |
+| `POST` | `/api/v1/integration/booking-events` | SMP only — `Authorization: Bearer <shared secret>`, never a JWT |
 | `GET` | `/ws` (+ SockJS transport paths under it) | public handshake; the JWT is checked on the STOMP CONNECT frame |
 | `GET` | `/actuator/health`, `/actuator/info` | public |
 
@@ -97,6 +99,7 @@ no secret is committed.
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | `1` | Also what `/auth/login` reports as `expiresIn` |
 | `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | **none — required** | The two regional Atlas clusters. The only variables with no default: startup fails without them; the STOMP round-trip test skips itself and the context-load test fails |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
+| `SMP_WEBHOOK_SECRET` | dev placeholder | What SMP presents on `/integration/**`. Blank refuses every integration call rather than admitting them all |
 | `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards. The same list gates the `/ws` handshake |
 | `EMAIL_MODE` | `file` | `file` = write to disk, send nothing; `smtp` = send for real. Inert on `dev`, which pins the mode — see below |
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | `no-reply@fixinh.vn` / `Fixinh` | Envelope sender of the staff welcome email |
@@ -201,6 +204,24 @@ frame, where `StompAuthChannelInterceptor` applies the same checks as the HTTP f
 expiry, blacklist). A rejected frame gets an ERROR whose `message` header is the error code, as
 §2.7 does for HTTP.
 
+**What raises one (§11.7, Req 4.M3).** SMP owns the booking record, so a status change arrives
+at `POST /integration/booking-events` rather than starting inside SBP. The integration module
+validates it, resolves the customer's store, refreshes the booking projection, and only then
+publishes an in-process event that the notification module listens for. That order is the
+contract, not an accident of timing: §9.3 and Milestone 1 both require the projection to have
+caught up before the customer is told, so that tapping a scheduled-booking toast opens a screen
+that can already name the technician (Req 3.3.S5).
+
+Only `CONFIRMED` and `SCHEDULED` produce a notification. Every other status refreshes the
+projection silently — there is no `BOOKING_CREATED` or `BOOKING_CANCELLED` type, and booking
+creation returns its own confirmation in the `POST` response (Req 3.3.S3).
+
+A replayed `eventId` is answered, not repeated: `202 { "duplicate": true }`, no second row and
+no second push. That holds at two levels — the inbound event is recorded under SMP's own id, and
+the notification carries the `sourceEventId` it came from behind a sparse unique index in each
+shard. An event is marked handled only after every listener has returned, so a delivery that
+failed part-way is re-run on SMP's retry instead of being brushed off as a duplicate.
+
 On the client, `NotificationProvider` opens the socket for exactly as long as a customer is
 signed in — administrators receive no notifications and get no socket — and turns a pushed
 message into the newest unread row and a toast: one push, one row, one toast, deduplicated by
@@ -225,9 +246,19 @@ back.
   closes the socket outright, which is what triggers the reconnect.
 - The page-level `Toast` (top-centre, per page) predates the design mockup; the shared
   `ToastStack` is the mockup's. Pages should migrate their success messages to `useToast`.
+- `/integration/**` is guarded by a shared secret, not by §11.1's token exchange. The filter
+  grants the `SERVICE` role once the secret matches, so swapping in a signed service JWT later
+  changes that one comparison and nothing downstream.
+- An inbound event for a `bookingRef` SBP has no projection of is refused with
+  `BOOKING_NOT_FOUND`. SBP does not build a booking from an event: every booking it knows was
+  created through it, and a silent insert would hide a genuine disagreement between the two
+  systems.
 - Backend tests: `./mvnw test` runs the unit suites anywhere; the tests that bring up the
-  application (`SbpApplicationTests`, the STOMP round trip) need the two Atlas URIs and are
-  skipped or fail without them. The frontend has no test runner yet.
+  application (`SbpApplicationTests`, the STOMP round trip, the booking-event flow) need the two
+  Atlas URIs and are skipped or fail without them. The frontend has no test runner yet.
+- `CustomerServiceImpl` implements both the internal and the external customer interface, so a
+  test cannot substitute the module by either interface alone — it has to mock the class. Worth
+  splitting into two beans.
 
 ---
 

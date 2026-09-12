@@ -110,4 +110,20 @@ public class ServiceBooking {
 
 	/** Which shard holds the authoritative copy — the customer's home region, not the job's. */
 	private Region homeRegion;
+
+	/**
+	 * When this projection was last known to match SMP (§2.8, §11.7) — the {@code occurredAt}
+	 * of the most recent change SMP reported, not the moment SBP wrote it.
+	 *
+	 * <p>SMP's clock rather than SBP's, because this answers "how current is what you are
+	 * showing me", and a receive time would answer "how recently did we talk", which is a
+	 * different and less useful question when an event has been queued or retried.
+	 *
+	 * <p>Also the guard against an event that overtakes another: a refresh whose
+	 * {@code occurredAt} is older than this one is stale, and applying it would move the
+	 * booking backwards. Null on a booking SMP has never reported a change to, which §7.2 and
+	 * §7.3 publish as {@code lastSyncedAt} — the creation moment being the last time it was
+	 * demonstrably right.
+	 */
+	private Instant lastSyncedAt;
 }

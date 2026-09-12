@@ -267,7 +267,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				toBillDto(booking.getBill()),
 				toCancellationDto(booking),
 				ratingService.hasLiveRating(booking.getBookingRef()),
-				booking.getCreatedAt());
+				lastSyncedAt(booking));
 	}
 
 	/**
@@ -370,6 +370,15 @@ public class BookingServiceImpl implements BookingExternalService {
 						&& technician.fullName().toLowerCase(Locale.ROOT).contains(needle));
 	}
 
+	/**
+	 * How current this projection is (§7.2, §7.3). SMP's own {@code occurredAt} once it has
+	 * reported a change; before that, the moment the booking was created here -- which is
+	 * the last time it was demonstrably right, SBP having authored it.
+	 */
+	private static Instant lastSyncedAt(ServiceBooking booking) {
+		return booking.getLastSyncedAt() != null ? booking.getLastSyncedAt() : booking.getCreatedAt();
+	}
+
 	private boolean matchesService(ServiceBooking booking, List<String> serviceIds) {
 		return serviceIds == null || serviceIds.isEmpty() || serviceIds.contains(booking.getServiceId());
 	}
@@ -413,9 +422,7 @@ public class BookingServiceImpl implements BookingExternalService {
 				scheduled && technicians != null && !technicians.isEmpty() ? technicians : null,
 				completed && booking.getBill() != null ? booking.getBill().totalCost() : null,
 				ratingService.hasLiveRating(booking.getBookingRef()),
-				// No sync pipeline updates a booking after creation yet (no §11.7 receiver), so
-				// createdAt is the last moment this projection is known to have been correct.
-				booking.getCreatedAt());
+				lastSyncedAt(booking));
 	}
 
 	/**

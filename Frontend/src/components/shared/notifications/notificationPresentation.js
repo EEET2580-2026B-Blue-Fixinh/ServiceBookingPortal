@@ -61,7 +61,11 @@ export function presentationFor(type) {
  */
 export function toastFor(notification) {
   const { title, tone } = presentationFor(notification.type)
-  return { tone, title, body: notification.message }
+  // `to` rather than a click handler: the queue holds data, and what a tone or a
+  // destination looks like is the stack's business. A notification about no
+  // booking has nowhere to go and yields a toast with no `to` at all, which the
+  // stack draws as a plain card.
+  return { tone, title, body: notification.message, to: routeFor(notification) }
 }
 
 // The API sends ISO-8601 UTC and the frontend displays
@@ -121,12 +125,11 @@ export function formatNotificationTime(createdAt, now) {
  * on a notification that concerns no booking (`@JsonInclude(NON_NULL)` on the
  * DTO), and STAFF_ACCOUNT_CREATED never has one. The item renders both shapes.
  *
- * <p><b>Landing on the booking itself is a one-line change to this function.</b>
- * `/booking/:bookingRef` is served now (ROUTES.BOOKING_DETAIL), but the panel still
- * sends the reader to the bookings list, as it did before the detail page existed.
- * Returning the detail path here would change that, and nothing else in the panel
- * would move; it is left to whoever owns the panel's navigation behaviour.
+ * <p>The booking itself, not the bookings list. A notification names one booking
+ * and the reader opened it to see that one; landing on the list would make them
+ * find it again. Both surfaces that open a notification — the panel and the toast
+ * a push raises — go through here, so the two cannot drift apart.
  */
 export function routeFor(notification) {
-  return notification.bookingRef ? ROUTES.BOOKING : null
+  return notification.bookingRef ? ROUTES.bookingDetail(notification.bookingRef) : null
 }

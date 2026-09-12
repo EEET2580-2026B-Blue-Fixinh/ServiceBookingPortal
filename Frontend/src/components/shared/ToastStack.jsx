@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { MaterialIcon } from './icons'
 import { useToast } from '../../context/ToastContext'
 
@@ -25,7 +26,49 @@ const TONES = {
   neutral: { icon: 'info', color: 'text-bk-muted', border: 'border-bk-muted' },
 }
 
-function ToastCard({ toast, onDismiss }) {
+/**
+ * The icon and the text. A button when the toast has somewhere to go, a plain
+ * span otherwise.
+ *
+ * Two shapes rather than one always-a-button shape: a button that does nothing
+ * still takes focus and still announces itself as a button, which is a promise
+ * broken for anyone navigating by keyboard. And the close button has to stay
+ * outside whichever of the two this returns -- a button inside a button is
+ * invalid HTML, and browsers resolve it by dropping one of them.
+ */
+function ToastFace({ toast, onOpen }) {
+  const tone = TONES[toast.tone] ?? TONES.neutral
+
+  const face = (
+    <>
+      <MaterialIcon name={tone.icon} className={`text-[19px] leading-none ${tone.color}`} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-semibold text-bk-text">{toast.title}</span>
+        {toast.body && (
+          <span className="mt-[2px] block text-xs text-bk-muted">{toast.body}</span>
+        )}
+      </span>
+    </>
+  )
+
+  if (!toast.to) {
+    return <span className="flex min-w-0 flex-1 items-start gap-[10px]">{face}</span>
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex min-w-0 flex-1 appearance-none items-start gap-[10px] bg-transparent
+        text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bk-teal
+        focus-visible:ring-offset-2 focus-visible:ring-offset-bk-surface"
+    >
+      {face}
+    </button>
+  )
+}
+
+function ToastCard({ toast, onOpen, onDismiss }) {
   const tone = TONES[toast.tone] ?? TONES.neutral
 
   return (
@@ -39,13 +82,7 @@ function ToastCard({ toast, onDismiss }) {
       className={`animate-fx-toast pointer-events-auto flex max-w-[340px] items-start gap-[10px]
         rounded-[12px] border bg-bk-surface px-[14px] py-3 text-left shadow-lg ${tone.border}`}
     >
-      <MaterialIcon name={tone.icon} className={`text-[19px] leading-none ${tone.color}`} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold text-bk-text">{toast.title}</span>
-        {toast.body && (
-          <span className="mt-[2px] block text-xs text-bk-muted">{toast.body}</span>
-        )}
-      </span>
+      <ToastFace toast={toast} onOpen={onOpen} />
       <button
         type="button"
         onClick={onDismiss}
@@ -60,6 +97,17 @@ function ToastCard({ toast, onDismiss }) {
 
 export function ToastStack() {
   const { toasts, dismissToast } = useToast()
+  const navigate = useNavigate()
+
+  // Opening runs the toast's own hook first -- for a pushed notification that is
+  // what marks it read -- then navigates, then clears the card. Dismissing last,
+  // so a failure in either of the first two leaves the toast on screen to try
+  // again rather than disappearing having done half the job.
+  const openToast = (toast) => {
+    toast.onOpen?.()
+    navigate(toast.to)
+    dismissToast(toast.id)
+  }
 
   if (toasts.length === 0) return null
 
@@ -71,7 +119,12 @@ export function ToastStack() {
         items-end gap-[10px]"
     >
       {toasts.map((toast) => (
-        <ToastCard key={toast.id} toast={toast} onDismiss={() => dismissToast(toast.id)} />
+        <ToastCard
+          key={toast.id}
+          toast={toast}
+          onOpen={() => openToast(toast)}
+          onDismiss={() => dismissToast(toast.id)}
+        />
       ))}
     </div>
   )
