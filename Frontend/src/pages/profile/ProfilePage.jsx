@@ -198,19 +198,24 @@ export function ProfilePage() {
         </p>
       )}
 
+      {/* Centred on purpose: the column is narrower than the frame's content container, and
+          left as a plain max-width it would hug the left edge of a wide screen. Every grid
+          inside sizes itself with auto-fit rather than a breakpoint, so the same markup
+          stacks on a phone, pairs up on a tablet and never needs a pixel value revisited. */}
       {status === 'ready' && profile && (
-        <div className="grid max-w-[760px] gap-4">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-bk-border bg-bk-surface p-[18px] shadow-sm">
-            <div className="flex items-center gap-3">
-              <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-bk-teal-soft text-lg font-bold text-bk-teal-strong">
-                {getInitials(profile.fullName)}
-              </span>
-              <div>
-                <p className="text-lg font-extrabold text-bk-text">{profile.fullName}</p>
-                <p className="text-[13.5px] text-bk-muted">{profile.email}</p>
-              </div>
+        <div className="mx-auto grid w-full max-w-[720px] gap-4">
+          {/* Wraps rather than spreads: a 24-character id that may not shrink, next to a name
+             that may not shrink, used to force this card — and with it every card in the
+             column — wider than a phone. The id drops to its own line instead. */}
+          <div className="flex flex-wrap items-center gap-3.5 rounded-xl border border-bk-border bg-bk-surface p-[18px] shadow-sm">
+            <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-bk-teal-soft text-lg font-bold text-bk-teal-strong">
+              {getInitials(profile.fullName)}
+            </span>
+            <div className="min-w-0 flex-1 basis-[180px]">
+              <p className="truncate text-lg font-extrabold text-bk-text">{profile.fullName}</p>
+              <p className="truncate text-[13.5px] text-bk-muted">{profile.email}</p>
             </div>
-            <span className="shrink-0 rounded-full border border-bk-border bg-bk-bg px-3 py-1 font-mono text-[11.5px] font-bold text-bk-muted">
+            <span className="max-w-full truncate rounded-full border border-bk-border bg-bk-bg px-3 py-1 font-mono text-[11.5px] font-bold text-bk-muted">
               {profile.customerId}
             </span>
           </div>
@@ -273,7 +278,7 @@ export function ProfilePage() {
                   />
                 </FormField>
 
-                <div className="grid grid-cols-3 gap-3.5 max-[560px]:grid-cols-1">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3.5">
                   <FormField label="Street number" htmlFor="profile-streetNumber">
                     <input
                       id="profile-streetNumber"
@@ -346,10 +351,10 @@ export function ProfilePage() {
               </form>
             ) : (
               <>
-                <div className="mt-4 grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
-                  <div>
+                <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+                  <div className="min-w-0">
                     <p className="text-[12px] text-bk-muted">Email (used to sign in)</p>
-                    <p className="mt-0.5 font-bold text-bk-text">{profile.email}</p>
+                    <p className="mt-0.5 break-words font-bold text-bk-text">{profile.email}</p>
                   </div>
                   <div>
                     <p className="text-[12px] text-bk-muted">Phone number</p>
@@ -373,7 +378,7 @@ export function ProfilePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
             <div className="rounded-xl border border-bk-border bg-bk-surface p-[18px] shadow-sm">
               <p className="mb-3 text-[11.5px] font-bold tracking-[0.04em] text-bk-muted">ACCOUNT</p>
               <div className="grid gap-3">
