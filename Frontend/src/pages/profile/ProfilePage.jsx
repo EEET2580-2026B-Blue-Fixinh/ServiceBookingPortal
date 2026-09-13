@@ -38,7 +38,9 @@ function InfoRow({ icon, children }) {
   return (
     <div className="flex items-center gap-2.5 text-[13.5px] text-bk-text">
       <MaterialIcon name={icon} className="text-[19px] text-bk-muted" />
-      {children}
+      {/* One span, so a label and its <strong> value wrap as a sentence when the card is
+          narrow, rather than as two flex items that each break mid-phrase. */}
+      <span className="min-w-0">{children}</span>
     </div>
   )
 }
@@ -198,12 +200,12 @@ export function ProfilePage() {
         </p>
       )}
 
-      {/* Centred on purpose: the column is narrower than the frame's content container, and
-          left as a plain max-width it would hug the left edge of a wide screen. Every grid
-          inside sizes itself with auto-fit rather than a breakpoint, so the same markup
-          stacks on a phone, pairs up on a tablet and never needs a pixel value revisited. */}
+      {/* Left-aligned at 680px inside the frame's content container, as the design mockup
+          draws it. Every grid inside sizes itself with auto-fit rather than a breakpoint,
+          so the same markup stacks on a phone, pairs up on a tablet and never needs a
+          pixel value revisited. */}
       {status === 'ready' && profile && (
-        <div className="mx-auto grid w-full max-w-[720px] gap-4">
+        <div className="grid max-w-[680px] gap-4">
           {/* Wraps rather than spreads: a 24-character id that may not shrink, next to a name
              that may not shrink, used to force this card — and with it every card in the
              column — wider than a phone. The id drops to its own line instead. */}

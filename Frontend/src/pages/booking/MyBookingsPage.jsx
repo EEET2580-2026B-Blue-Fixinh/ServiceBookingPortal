@@ -68,7 +68,7 @@ function BookingCard({ booking, iconFor, onCancel, onOpen }) {
           onOpen(booking);
         }
       }}
-      className="flex cursor-pointer items-center gap-4 rounded-xl border border-bk-border bg-bk-surface px-[18px] py-4 hover:border-bk-teal focus:border-bk-teal focus:outline-none focus:ring-[3px] focus:ring-bk-teal-soft max-[700px]:flex-wrap"
+      className="flex cursor-pointer items-center gap-4 rounded-xl border border-bk-border bg-bk-surface px-[18px] py-4 hover:border-bk-teal focus:border-bk-teal focus:outline-none focus:ring-[3px] focus:ring-bk-teal-soft flex-wrap"
     >
       <span className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] bg-bk-bg text-bk-text">
         <MaterialIcon
@@ -77,8 +77,12 @@ function BookingCard({ booking, iconFor, onCancel, onOpen }) {
         />
       </span>
 
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="flex items-baseline gap-2 text-[15.5px] font-bold text-bk-text">
+      {/* Wraps by content, not by a viewport width (design mockup, booking row): the name
+          block and the schedule chip each declare the width they need, and the row breaks
+          wherever the two stop fitting side by side. A breakpoint could only guess at
+          that point, and guessed wrong on small laptops with the sidebar open. */}
+      <span className="flex min-w-0 flex-1 basis-[180px] flex-col gap-1">
+        <span className="flex flex-wrap items-baseline gap-2 text-[15.5px] font-bold text-bk-text">
           {booking.serviceName}
           <span className="font-mono text-[12.5px] font-medium text-bk-muted">
             {booking.bookingRef}
@@ -90,15 +94,15 @@ function BookingCard({ booking, iconFor, onCancel, onOpen }) {
       </span>
 
       {schedule && (
-        <span className="flex shrink-0 items-center gap-2.5 rounded-[10px] bg-bk-teal-soft px-[14px] py-[9px] text-bk-teal-strong">
+        <span className="flex flex-1 basis-[210px] items-center gap-2.5 rounded-[10px] bg-bk-teal-soft px-[14px] py-[9px] text-bk-teal-strong">
           <MaterialIcon
             name="event_available"
             className="text-xl text-bk-teal"
           />
-          <span className="flex flex-col leading-[1.3]">
+          <span className="flex min-w-0 flex-col leading-[1.3]">
             <span className="text-[13.5px] font-bold">{schedule.label}</span>
             {schedule.technicians.length > 0 && (
-              <span className="text-[12.5px] text-bk-teal-strong opacity-85">
+              <span className="truncate text-[12.5px] text-bk-teal-strong opacity-85">
                 {schedule.technicians.join(", ")}
               </span>
             )}
@@ -106,7 +110,7 @@ function BookingCard({ booking, iconFor, onCancel, onOpen }) {
         </span>
       )}
 
-      <span className="ml-auto flex shrink-0 items-center gap-3.5 max-[700px]:ml-0 max-[700px]:w-full max-[700px]:justify-between max-[700px]:pl-[58px]">
+      <span className="ml-auto flex shrink-0 items-center gap-3.5">
         {total && (
           <span className="flex flex-col items-end leading-[1.3]">
             <span className="text-[10.5px] font-bold uppercase tracking-[0.06em] text-bk-muted">
