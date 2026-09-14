@@ -29,7 +29,7 @@ services:
       - key: JWT_REFRESH_TOKEN_TTL_DAYS
         value: 30
       - key: CORS_ALLOWED_ORIGINS
-        value: https://fixinh-service-booking-portal.vercel.app,https://fixinh-service-booking-portal-pjvzw7rpz-hoquanghuys-projects.vercel.app,https://fixinh-service-booking-portal-2v1bsmwu9-hoquanghuys-projects.vercel.app
+        value: https://fixinh-service-booking-portal.vercel.app,https://fixinh-service-booking-portal-preview.vercel.app
       - key: SMP_MODE
         value: mock
       - key: SMP_STAFF_MODE
