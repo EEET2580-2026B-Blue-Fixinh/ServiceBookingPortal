@@ -86,6 +86,9 @@ pnpm dev
 
 Must stay on **port 3000** — it is the only origin the backend's CORS policy admits.
 
+For Vercel Preview/Production settings, environment-variable boundaries and the
+promotion workflow, see [docs/vercel-deployment.md](docs/vercel-deployment.md).
+
 ---
 
 ## Configuration
