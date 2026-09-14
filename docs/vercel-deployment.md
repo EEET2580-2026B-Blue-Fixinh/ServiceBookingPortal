@@ -6,12 +6,16 @@ background jobs.
 
 ## Project settings
 
-Import this repository as one Vercel project with these settings:
+The organization repository is private and the project uses Vercel Hobby, so it
+is intentionally not connected through Vercel's Git integration. Deploy from
+the checked-out local branch with the Vercel CLI instead.
+
+The existing Vercel project uses these settings:
 
 | Setting | Value |
 |---|---|
-| Production Branch | `main` |
-| Root Directory | `Frontend` |
+| Project | `fixinh-service-booking-portal` |
+| Root Directory | unset (the CLI uploads `Frontend` as the root) |
 | Framework Preset | Vite |
 | Install Command | `pnpm install --frozen-lockfile` |
 | Build Command | `pnpm build` |
@@ -54,12 +58,35 @@ Use an exact comma-separated origin list when both Preview and Production must
 work. Do not use `*`; the same allow-list protects the SockJS/WebSocket
 handshake.
 
-## Promotion workflow
+## Manual Preview and Production workflow
 
-1. Push `chore/vercel-deployment` and test its Vercel Preview deployment.
-2. Check direct route reloads, authentication, REST calls, CORS, and WebSocket
-   notifications.
-3. Add the Production environment-variable values.
-4. Merge the reviewed branch into `main` to create the Production deployment.
-5. Smoke-test the production URL and roll back in Vercel if a regression is
-   found.
+Run every Vercel command from `Frontend`; running it from the repository root
+would upload the backend and documentation too.
+
+To deploy the currently checked-out feature branch as Preview:
+
+```bash
+git status --short
+cd Frontend
+npx --yes vercel@latest deploy
+```
+
+Only deploy Production after the reviewed feature branch has been merged. Start
+from an up-to-date, clean `main` worktree:
+
+```bash
+git switch main
+git pull --ff-only
+git status --short
+cd Frontend
+npx --yes vercel@latest deploy --prod
+```
+
+Before using `--prod`, verify that the Production environment variables point
+to the production backend and that `VITE_SHOW_DEMO_ACCOUNT=false`. Then test
+direct route reloads, authentication, REST calls, CORS, and WebSocket
+notifications. Roll back the deployment in Vercel if a regression is found.
+
+The first CLI deployment of a newly created Vercel project is assigned to
+Production automatically. Subsequent CLI deployments are Preview unless
+`--prod` is supplied.
