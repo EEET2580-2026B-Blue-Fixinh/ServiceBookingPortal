@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: fixinh-sbp-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: chore/vercel-deployment
+    autoDeployTrigger: off
+    dockerfilePath: ./Backend/Dockerfile
+    dockerContext: ./Backend
+    healthCheckPath: /actuator/health
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: SERVER_PORT
+        value: 10000
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=20 -XX:+UseSerialGC -XX:ReservedCodeCacheSize=64m
+      - key: MONGO_URI_NORTH
+        sync: false
+      - key: MONGO_URI_SOUTH
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ISSUER
+        value: fixinh-sbp
+      - key: JWT_ACCESS_TOKEN_TTL_MINUTES
+        value: 60
+      - key: JWT_REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://fixinh-service-booking-portal.vercel.app,https://fixinh-service-booking-portal-pjvzw7rpz-hoquanghuys-projects.vercel.app
+      - key: SMP_MODE
+        value: mock
+      - key: SMP_STAFF_MODE
+        value: mock
+      - key: EMAIL_MODE
+        value: file
+      - key: EMAIL_RETRY_ENABLED
+        value: false
+      - key: IMAGE_STORAGE_MODE
+        value: local

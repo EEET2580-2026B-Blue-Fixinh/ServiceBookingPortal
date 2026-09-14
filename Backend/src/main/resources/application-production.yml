@@ -1,0 +1,17 @@
+# Public hosting terminates TLS before forwarding traffic to Spring Boot.
+# Forwarded headers let generated URLs and security decisions retain the
+# original HTTPS scheme without shipping a private keystore in the container.
+server:
+  ssl:
+    enabled: false
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    com.fixinh.sbp: INFO
+
+# Keep public health output minimal while retaining Render's readiness probe.
+management:
+  endpoint:
+    health:
+      show-details: never
