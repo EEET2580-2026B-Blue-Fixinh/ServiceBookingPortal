@@ -58,17 +58,22 @@ public class CloudinaryImageStorageService implements ImageStorageService {
 			String publicId = "%s/%s-%d".formatted(
 					folder, baseName.toLowerCase(Locale.ROOT), index + 1);
 
-			urls.add(upload(images.get(index), publicId, index + 1, images.size()));
+			urls.add(upload(images.get(index), folder, publicId, index + 1, images.size()));
 		}
 
 		log.info("Uploaded {} image(s) for {}/{}", urls.size(), folder, baseName);
 		return List.copyOf(urls);
 	}
 
-	private String upload(MultipartFile image, String publicId, int position, int total) {
+	private String upload(MultipartFile image, String folder, String publicId, int position,
+			int total) {
 		try {
 			Map<?, ?> result = cloudinary.uploader().upload(image.getBytes(), ObjectUtils.asMap(
 					"public_id", publicId,
+					// Accounts created since June 2024 use dynamic folders, where the slash in
+					// publicId shapes only the URL. Without this, every image lands in the Media
+					// Library root instead of cancel/ or ratings/.
+					"asset_folder", folder,
 					"resource_type", "image",
 					// Re-uploading the same evidence replaces it rather than accumulating
 					// near-duplicates under generated names.
