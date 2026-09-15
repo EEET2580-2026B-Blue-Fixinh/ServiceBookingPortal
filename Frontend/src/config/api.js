@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
   },
 
   CUSTOMERS: {
+    ME: "/customers/me",
     MY_ADDRESS: "/customers/me/address",
   },
 

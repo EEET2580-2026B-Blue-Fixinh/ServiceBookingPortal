@@ -264,14 +264,6 @@ public class NotificationServiceImpl implements NotificationInternalService, Not
 		});
 	}
 
-	@Override
-	public long unreadCount(String callerId, Role callerRole) {
-		return storeFor(callerId, callerRole)
-				.map(region -> notificationRepository.count(
-						region, RecipientType.CUSTOMER, callerId, true))
-				.orElse(0L);
-	}
-
 	/**
 	 * The store to read this caller's notifications from, or empty when they can have none.
 	 */

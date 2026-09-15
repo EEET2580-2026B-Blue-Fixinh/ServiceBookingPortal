@@ -249,7 +249,7 @@ class ShardedNotificationRepositoryTest {
 
 	@Test
 	void answersEmptyForABlankEventIdWithoutAskingAStore() {
-		// A blank id can match nothing, so there is nothing to ask. Same rule as findById.
+		// A blank id can match nothing, so there is nothing to ask.
 		assertTrue(repository.findBySourceEventId(Region.SOUTH, "  ").isEmpty());
 		assertTrue(repository.findBySourceEventId(Region.SOUTH, null).isEmpty());
 

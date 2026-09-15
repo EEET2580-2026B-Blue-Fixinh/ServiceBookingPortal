@@ -59,6 +59,18 @@ public class SecurityConfig {
 						// cannot require the token registration has not issued yet (Req 3.1.S4).
 						.requestMatchers("/api/v1/reference/provinces").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info").permitAll()
+						// The container's error dispatch. Spring Security filters an ERROR
+						// dispatch as well as the REQUEST that caused it, and
+						// JwtAuthenticationFilter -- a OncePerRequestFilter -- skips error
+						// dispatches by default, so the second pass arrives with no
+						// authentication at all. Without this line anyRequest().authenticated()
+						// then answers 401 AUTH_TOKEN_MISSING and the real failure never
+						// reaches the caller: a wrong method reads as a missing token, and so
+						// does a path no controller maps. Nothing is disclosed by opening it --
+						// GlobalExceptionHandler renders everything it can reach before
+						// dispatch, and Spring Boot's defaults keep the exception, its message
+						// and the stack trace out of the body this endpoint produces.
+						.requestMatchers("/error").permitAll()
 						// The WebSocket handshake is unauthenticated by design (API Doc §9.3):
 						// SockJS cannot put a bearer token on it. The token travels in the STOMP
 						// CONNECT frame instead and is checked there by

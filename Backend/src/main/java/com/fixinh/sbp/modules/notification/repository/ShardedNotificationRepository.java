@@ -58,23 +58,6 @@ public class ShardedNotificationRepository implements NotificationRepository {
 	}
 
 	@Override
-	public Optional<Notification> findById(String id) {
-		if (id == null || id.isBlank()) {
-			return Optional.empty();
-		}
-
-		Query query = Query.query(Criteria.where(FIELD_ID).is(id));
-
-		// South first, then north -- the same order ShardedCustomerRepository uses. Neither
-		// store is more likely, so consistency between the two classes is the tie-breaker.
-		Notification found = south.findOne(query, Notification.class);
-		if (found == null) {
-			found = north.findOne(query, Notification.class);
-		}
-		return Optional.ofNullable(found);
-	}
-
-	@Override
 	public List<Notification> findOutstandingEmails(int limit) {
 		// Field order matches the {deliveryStatus, lastAttemptAt} index that
 		// ShardIndexInitializer creates, so this reads an index range rather than scanning

@@ -361,7 +361,6 @@ class NotificationServiceImplTest {
 	void anAdministratorMarkingAllReadIsAQuietNoOp() {
 		service.markAllRead("ADMIN-1", Role.ADMIN);
 
-		assertEquals(0L, service.unreadCount("ADMIN-1", Role.ADMIN));
 		verifyNoInteractions(repository);
 	}
 

@@ -22,14 +22,6 @@ public interface NotificationRepository {
 	Notification save(Notification notification);
 
 	/**
-	 * By identifier, from whichever store holds it.
-	 *
-	 * <p>The id carries no region, so this may ask both. Acceptable here — it happens after
-	 * authentication and once per request, not on a hot path.
-	 */
-	Optional<Notification> findById(String id);
-
-	/**
 	 * Emails that have not been delivered yet, oldest attempt first, from both stores.
 	 *
 	 * <p>Matches {@code PENDING} and {@code FAILED} on the {@code EMAIL} channel — the two
@@ -57,10 +49,11 @@ public interface NotificationRepository {
 	List<Notification> findOutstandingEmails(int limit);
 
 	// --- The recipient's own history -----------------------------------------
-	// Every method below names a region, unlike the three above. Those are asked without a
-	// recipient in hand and so have to try both stores; these are asked on behalf of a
-	// signed-in caller whose store the service has already resolved. Passing it means one
-	// store is read instead of two, and another region's rows cannot come back by accident.
+	// Every method below names a region, unlike the two above. Those are asked without a
+	// recipient in hand -- a notification carries its own, and a sweep has none at all --
+	// while these are asked on behalf of a signed-in caller whose store the service has
+	// already resolved. Passing it means one store is read instead of two, and another
+	// region's rows cannot come back by accident.
 
 	/**
 	 * One page of a recipient's notifications, newest first.
