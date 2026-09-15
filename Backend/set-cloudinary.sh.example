@@ -1,0 +1,25 @@
+#!/bin/bash
+# Template for Cloudinary credentials setup (Reqs 3.3.M1, 3.4.M1: evidence images)
+#
+# Copy this file to set-cloudinary.sh and fill in your credentials:
+#   cp set-cloudinary.sh.example set-cloudinary.sh
+#
+# Get credentials from: https://console.cloudinary.com
+#   Cloud name          -> Dashboard, under "Product Environment"
+#   API key / secret    -> Settings (sidebar) -> API Keys
+# Then run: source ./set-cloudinary.sh
+#
+# The Free plan needs no credit card. Never put these values in the frontend (VITE_*).
+
+export IMAGE_STORAGE_MODE="cloudinary"
+export CLOUDINARY_CLOUD_NAME="your-cloud-name"
+export CLOUDINARY_API_KEY="your-api-key"
+export CLOUDINARY_API_SECRET="your-api-secret"
+
+echo "Cloudinary credentials set!"
+echo "   IMAGE_STORAGE_MODE: $IMAGE_STORAGE_MODE"
+echo "   CLOUDINARY_CLOUD_NAME: $CLOUDINARY_CLOUD_NAME"
+echo "   CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:0:6}..."
+echo "   CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:0:4}***"
+echo ""
+echo "Now run: ./mvnw spring-boot:run"

@@ -44,3 +44,4 @@ acceptance-notifications.ps1
 application-local.yml
 set-google-oauth.sh
 set-mongo-atlas.sh
+set-cloudinary.sh
