@@ -48,9 +48,21 @@ class SmpClientConfigTest {
 
 	@Test
 	void staffGoLiveOnlyWhenTheirOwnSwitchSaysSo() {
-		runner.withPropertyValues("fixinh.sbp.smp.mode=live", "fixinh.sbp.smp.staff-mode=live")
+		runner.withPropertyValues(
+						"fixinh.sbp.smp.mode=live",
+						"fixinh.sbp.smp.staff-mode=live",
+						"fixinh.sbp.smp.staff-base-url=http://localhost:8090",
+						"fixinh.sbp.smp.staff-service-token=test-staff-token")
 				.run(context -> assertInstanceOf(LiveSmpStaffClient.class,
 						context.getBean(SmpStaffClient.class)));
+	}
+
+	@Test
+	void liveStaffRefusesToStartWithoutItsOwnBaseUrl() {
+		runner.withPropertyValues("fixinh.sbp.smp.staff-mode=live",
+						"fixinh.sbp.smp.staff-service-token=test-staff-token")
+				.run(context -> org.assertj.core.api.Assertions.assertThat(context)
+						.hasFailed());
 	}
 
 	@Test
