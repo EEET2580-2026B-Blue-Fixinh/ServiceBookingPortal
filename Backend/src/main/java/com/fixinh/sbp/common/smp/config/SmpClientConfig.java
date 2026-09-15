@@ -36,8 +36,8 @@ public class SmpClientConfig {
 
 	@Bean
 	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "staff-mode", havingValue = "live")
-	public SmpStaffClient liveSmpStaffClient() {
-		return new LiveSmpStaffClient();
+	public SmpStaffClient liveSmpStaffClient(SbpProperties properties) {
+		return new LiveSmpStaffClient(staffRestClient(properties.getSmp()));
 	}
 
 	@Bean
@@ -67,6 +67,24 @@ public class SmpClientConfig {
 		if (token == null || token.isBlank()) {
 			throw new IllegalStateException(
 					"fixinh.sbp.smp.service-token must be set when smp.mode is live.");
+		}
+		return RestClient.builder()
+				.baseUrl(baseUrl)
+				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.build();
+	}
+
+	/** Same shape as {@link #smpRestClient}, reading the staff-specific pair instead. */
+	private static RestClient staffRestClient(SbpProperties.Smp smp) {
+		String baseUrl = smp.getStaffBaseUrl();
+		if (baseUrl == null || baseUrl.isBlank()) {
+			throw new IllegalStateException(
+					"fixinh.sbp.smp.staff-base-url must be set when smp.staff-mode is live.");
+		}
+		String token = smp.getStaffServiceToken();
+		if (token == null || token.isBlank()) {
+			throw new IllegalStateException(
+					"fixinh.sbp.smp.staff-service-token must be set when smp.staff-mode is live.");
 		}
 		return RestClient.builder()
 				.baseUrl(baseUrl)
