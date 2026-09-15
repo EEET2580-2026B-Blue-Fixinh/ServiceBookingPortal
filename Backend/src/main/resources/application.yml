@@ -99,6 +99,11 @@ fixinh:
       # The bearer token SMT expects on every call. Their development default;
       # a real one belongs in the environment, never in this file.
       service-token: ${SMP_SERVICE_TOKEN:local-integration-token}
+      # Separate from base-url/service-token above: staff-mode=live must never point at
+      # SMT's real service (base-url), which has no staff API and would 404 every call.
+      # This is MockSMP's own address instead -- see MockSMP/README.md.
+      staff-base-url: ${SMP_STAFF_BASE_URL:http://localhost:8090}
+      staff-service-token: ${SMP_STAFF_SERVICE_TOKEN:dev-only-shared-secret}
       # The mirror image: the bearer SMP presents on every call to /integration (Req 4.M2,
       # API Doc §11.1), checked by IntegrationAuthenticationFilter with a constant-time
       # compare. Blank refuses every integration call rather than admitting them all. The

@@ -121,6 +121,18 @@ public class SbpProperties {
 		 * {@code live}, unused when it is {@code mock}.
 		 */
 		private String serviceToken;
+
+		/**
+		 * Where a live {@link #staffMode} points, kept separate from {@link #baseUrl}. Staff and
+		 * bookings answer to different services — SMT's real one for bookings, a standalone
+		 * stand-in (MockSMP) for staff, since SMT publishes no staff API. Sharing {@link #baseUrl}
+		 * between them would send staff calls to SMT's service too, where every one 404s.
+		 */
+		private String staffBaseUrl;
+
+		/** The bearer token {@link #staffBaseUrl} checks. Separate from {@link #serviceToken} for
+		 * the same reason {@link #staffBaseUrl} is separate from {@link #baseUrl}. */
+		private String staffServiceToken;
 	}
 
 	/**
