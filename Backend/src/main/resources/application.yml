@@ -1,6 +1,10 @@
 spring:
   application:
     name: sbp
+  config:
+    # Local secrets live in Backend/.env (gitignored; copy .env.example). Optional, so a
+    # machine without one still starts, and a variable exported in the shell still wins.
+    import: optional:file:.env[.properties]
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
     # Req 3.1.S5: integration always sends real email, so it brings the smtp
