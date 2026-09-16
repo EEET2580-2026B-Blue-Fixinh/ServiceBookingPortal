@@ -1,0 +1,7 @@
+.env
+*.env.local
+.git
+.idea
+.vscode
+target
+HELP.md
