@@ -61,6 +61,34 @@ later is protected unless it is deliberately opened in
 
 ## Running it
 
+### Entire SBP + SMT stack with Docker
+
+The root Compose file runs the SBP web app and API, the SMT API, PostgreSQL, and both SBP
+MongoDB shards locally. It does not use Render or Atlas. By default, the separately checked-out
+SMT repository resolves to `/Users/hoquanghuy/ServiceManagementPortal` from this checkout. If it
+lives elsewhere, set `SMT_REPO_PATH` to that directory before running Compose.
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3000`. The host can reach SBP at `http://localhost:8443` and SMT at
+`http://localhost:9443`. Inside the Docker network SBP calls `http://smt-api:9443/api/v1`;
+using `localhost:9443` there would incorrectly point back to the SBP container.
+
+Import
+[`docker-local-sbp-smt-status-flow.postman_collection.json`](docs/postman/docker-local-sbp-smt-status-flow.postman_collection.json)
+into Postman to drive a newly created booking through confirmation, technician scheduling,
+working, and completion while checking both systems after each step.
+
+Stop the stack without deleting database data:
+
+```bash
+docker compose down
+```
+
+To also reset every local test database, run `docker compose down -v` deliberately.
+
 ### Backend
 
 ```powershell
