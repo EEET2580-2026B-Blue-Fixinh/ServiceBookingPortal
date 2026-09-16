@@ -14,11 +14,11 @@ what runs.
 | Setting | Effect |
 |---|---|
 | `SMP_STAFF_MODE=mock` (default) | `MockSmpStaffClient`: seeded from `Backend/src/main/resources/mocks/smp/staff.json`, created staff held in memory until the backend stops |
-| `SMP_STAFF_MODE=live` | `LiveSmpStaffClient` against `SMP_BASE_URL`. **Still a placeholder** — every method throws — so it has to be implemented before a stand-in server can be used |
+| `SMP_STAFF_MODE=live` | `LiveSmpStaffClient` against `SMP_STAFF_BASE_URL`, normally MockSMP (see `MockSMP/README.md`). Never `SMP_BASE_URL`: SMT's service has no staff API |
 | `SMP_MODE` | Bookings only. It no longer moves staff, so live bookings and mocked staff can run together |
 
-Every call carries `Authorization: Bearer <SMP_SERVICE_TOKEN>`, the same credential the live
-booking client sends.
+Every call carries `Authorization: Bearer <SMP_STAFF_SERVICE_TOKEN>`, a separate credential
+from the booking client's `SMP_SERVICE_TOKEN`.
 
 ## Endpoints
 
@@ -91,8 +91,9 @@ release). Three things in the create response make that work:
 | Unknown `staffId` on update or detail | `404` | `404 STAFF_NOT_FOUND` |
 | Unreachable, timed out, or any `5xx` | — | `503 SMP_UNAVAILABLE`, and no account was created (§10.6) |
 
-The first two are what the mock does today. The third is §10.6's contract for the live client,
-which has yet to implement it.
+The first two are what the mock does today. The third is §10.6's contract, and `LiveSmpStaffClient`
+maps it the same way `LiveSmpBookingClient` does: any non-2xx it doesn't otherwise recognise
+(409, 404) becomes `SMP_UNAVAILABLE`, same as an unreachable host or a timeout.
 
 §13.2 asks the staff mock for both roles plus a duplicate-email conflict on create, and the
 fixture and mock client already cover both. A stand-in server should keep them, and should
@@ -100,9 +101,9 @@ mock its failures as carefully as its successes.
 
 ## Checking a stand-in end to end
 
-Once the live client is written, point SBP at the stand-in (`SMP_STAFF_MODE=live`,
-`SMP_BASE_URL`, `SMP_SERVICE_TOKEN`). The scripts in `Backend/scripts` then exercise it
-through SBP, unchanged:
+Point SBP at the stand-in: `SMP_STAFF_MODE=live`, `SMP_STAFF_BASE_URL`,
+`SMP_STAFF_SERVICE_TOKEN`. The scripts in `Backend/scripts` then exercise it through SBP,
+unchanged:
 
 - `seed-mock-staff.ps1` creates a receptionist and a technician and checks each welcome letter.
 - `accept-staff-welcome-email.ps1` runs the issue's five acceptance criteria.
