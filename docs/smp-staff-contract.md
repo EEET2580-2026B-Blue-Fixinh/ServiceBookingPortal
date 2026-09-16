@@ -92,8 +92,8 @@ release). Three things in the create response make that work:
 | Unreachable, timed out, or any `5xx` | — | `503 SMP_UNAVAILABLE`, and no account was created (§10.6) |
 
 The first two are what the mock does today. The third is §10.6's contract, and `LiveSmpStaffClient`
-maps it the same way `LiveSmpBookingClient` does: any non-2xx it doesn't otherwise recognise
-(409, 404) becomes `SMP_UNAVAILABLE`, same as an unreachable host or a timeout.
+maps it the same way `LiveSmpBookingClient` does: any non-2xx other than 409/404 becomes
+`SMP_UNAVAILABLE`, same as an unreachable host or a timeout (5 s to connect, 10 s to read).
 
 §13.2 asks the staff mock for both roles plus a duplicate-email conflict on create, and the
 fixture and mock client already cover both. A stand-in server should keep them, and should
