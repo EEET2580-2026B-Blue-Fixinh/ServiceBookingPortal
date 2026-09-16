@@ -62,7 +62,23 @@ class SmpClientConfigTest {
 		runner.withPropertyValues("fixinh.sbp.smp.staff-mode=live",
 						"fixinh.sbp.smp.staff-service-token=test-staff-token")
 				.run(context -> org.assertj.core.api.Assertions.assertThat(context)
-						.hasFailed());
+						.hasFailed()
+						.getFailure()
+						.rootCause()
+						.isInstanceOf(IllegalStateException.class)
+						.hasMessageContaining("staff-base-url"));
+	}
+
+	@Test
+	void liveStaffRefusesToStartWithoutItsOwnServiceToken() {
+		runner.withPropertyValues("fixinh.sbp.smp.staff-mode=live",
+						"fixinh.sbp.smp.staff-base-url=http://localhost:8090")
+				.run(context -> org.assertj.core.api.Assertions.assertThat(context)
+						.hasFailed()
+						.getFailure()
+						.rootCause()
+						.isInstanceOf(IllegalStateException.class)
+						.hasMessageContaining("staff-service-token"));
 	}
 
 	@Test
