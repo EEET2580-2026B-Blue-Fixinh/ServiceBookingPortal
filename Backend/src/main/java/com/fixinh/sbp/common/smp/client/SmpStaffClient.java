@@ -9,8 +9,8 @@ import com.fixinh.sbp.common.smp.dto.SmpStaffUpdateRequest;
 
 /**
  * Receptionist/Technician account management, normally owned by SMP (Req 3.5.S1). "mock"
- * serves local fixtures so admin can run standalone; "live" would call the real SMP API once
- * it exists (Req 4.S2) — switched by {@code fixinh.sbp.smp.mode}.
+ * serves local fixtures so admin can run standalone; "live" calls a staff stand-in over HTTP
+ * (Req 4.S2) — switched by {@code fixinh.sbp.smp.staff-mode}.
  */
 public interface SmpStaffClient {
 

@@ -1,11 +1,12 @@
 # Req 4.M1, 4.M3, 5.M1: multi-VM environment integrating against the real SMP,
-# consuming its live Booking/Technician/Staff APIs instead of local fixtures.
+# consuming its live Booking/Technician APIs instead of local fixtures.
 fixinh:
   sbp:
     smp:
       mode: live
-      # Bookings only. Staff keep smp.staff-mode from application.yml, which stays
-      # mock until SMT publishes a staff API.
+      # Bookings only. Staff keep smp.staff-mode from application.yml (default mock),
+      # independently of this profile - live there means a staff stand-in such as
+      # MockSMP, never SMT's own service, which has no staff API to be live against.
 
 # Email is sent for real here (Req 3.1.S5), but the provider settings are not in
 # this file: the group in application.yml activates the smtp profile alongside

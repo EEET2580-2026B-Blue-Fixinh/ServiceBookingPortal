@@ -106,8 +106,9 @@ public class SbpProperties {
 		 * <p>SMT's service serves bookings but publishes no staff API yet (API Documentation
 		 * §12.8 is still provisional). Tying staff to {@code mode} meant that the moment SBP
 		 * talked to the real SMP, creating a receptionist or technician failed outright — and
-		 * with it the welcome email of Req 3.1.S5. So staff stay on the mock by default until
-		 * SMT ships staff endpoints; then this becomes {@code live}.
+		 * with it the welcome email of Req 3.1.S5. So staff default to the mock; {@code live}
+		 * points at {@link #staffBaseUrl} — a standalone stand-in such as MockSMP, never SMT's
+		 * own service, which has nothing to answer at.
 		 */
 		private String staffMode = "mock";
 
