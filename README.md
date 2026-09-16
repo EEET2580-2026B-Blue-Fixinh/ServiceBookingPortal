@@ -99,7 +99,7 @@ cd MockSMP
 
 Serves `http://localhost:8090`. Then point the backend at it: `SMP_STAFF_MODE=live`,
 `SMP_STAFF_BASE_URL=http://localhost:8090`, `SMP_STAFF_SERVICE_TOKEN` matching this service's
-own `SMP_SERVICE_TOKEN`.
+own `MOCKSMP_SERVICE_TOKEN`.
 
 ---
 
@@ -117,6 +117,7 @@ no secret is committed.
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | `1` | Also what `/auth/login` reports as `expiresIn` |
 | `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | **none — required** | The two regional Atlas clusters. The only variables with no default: startup fails without them; the STOMP round-trip test skips itself and the context-load test fails |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
+| `SMP_BASE_URL` / `SMP_SERVICE_TOKEN` | `http://localhost:9443/api/v1` / dev placeholder | Where `SMP_MODE=live` points (Team SMT's service) and the bearer it sends |
 | `SMP_STAFF_MODE` | `mock` | Staff only, independent of `SMP_MODE`. `live` calls `SMP_STAFF_BASE_URL` — never SMT's service, which has no staff API — normally a standalone `MockSMP` instance |
 | `SMP_STAFF_BASE_URL` / `SMP_STAFF_SERVICE_TOKEN` | `http://localhost:8090` / dev placeholder | Where `SMP_STAFF_MODE=live` points and the bearer it sends. Separate from `SMP_BASE_URL`/`SMP_SERVICE_TOKEN` above on purpose — see [MockSMP/README.md](MockSMP/README.md) |
 | `SMP_WEBHOOK_SECRET` | dev placeholder | What SMP presents on `/integration/**`. Blank refuses every integration call rather than admitting them all |

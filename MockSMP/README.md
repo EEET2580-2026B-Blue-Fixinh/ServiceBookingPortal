@@ -19,7 +19,7 @@ now reachable over HTTP instead of called in-process.
 
 Listens on `:8090` by default (`MOCKSMP_PORT` to change it). Every path except
 `/actuator/**` requires `Authorization: Bearer <token>`, checked against
-`SMP_SERVICE_TOKEN` (defaults to `dev-only-shared-secret` — fine for local dev, never for
+`MOCKSMP_SERVICE_TOKEN` (defaults to `dev-only-shared-secret` — fine for local dev, never for
 anything reachable outside your machine).
 
 ## Pointing SBP at it
@@ -27,7 +27,7 @@ anything reachable outside your machine).
 ```
 SMP_STAFF_MODE=live
 SMP_STAFF_BASE_URL=http://localhost:8090
-SMP_STAFF_SERVICE_TOKEN=dev-only-shared-secret   # must match this app's SMP_SERVICE_TOKEN
+SMP_STAFF_SERVICE_TOKEN=dev-only-shared-secret   # must match this app's MOCKSMP_SERVICE_TOKEN
 ```
 
 `SMP_STAFF_BASE_URL`/`SMP_STAFF_SERVICE_TOKEN` are separate from `SMP_BASE_URL`/

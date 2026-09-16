@@ -3,9 +3,10 @@ server:
 
 mocksmp:
   # SBP sends this as "Authorization: Bearer <token>" on every call (SMP_STAFF_SERVICE_TOKEN
-  # on SBP's side, per Backend/src/main/resources/application.yml). Blank refuses every
-  # request rather than accepting an unauthenticated one.
-  service-token: ${SMP_SERVICE_TOKEN:dev-only-shared-secret}
+  # on SBP's side, per Backend/src/main/resources/application.yml - a different variable name
+  # on purpose, so one name never means two different secrets). Blank refuses every request
+  # rather than accepting an unauthenticated one.
+  service-token: ${MOCKSMP_SERVICE_TOKEN:dev-only-shared-secret}
 
 management:
   endpoints:
