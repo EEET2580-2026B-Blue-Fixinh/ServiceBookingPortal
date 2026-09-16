@@ -40,8 +40,12 @@ public class LiveSmpStaffClient implements SmpStaffClient {
 			ListResponse response = http.get()
 					.uri(uriBuilder -> {
 						var builder = uriBuilder.path("/staff");
+						// The value is passed as a URI variable, not appended to the template
+						// string directly - otherwise a query containing '{' or '}' is parsed as
+						// an unresolved template placeholder, and a literal '+' survives into the
+						// query string, where the far end decodes it back to a space.
 						if (query != null && !query.isBlank()) {
-							builder = builder.queryParam("q", query);
+							return builder.queryParam("q", "{q}").build(query);
 						}
 						return builder.build();
 					})
