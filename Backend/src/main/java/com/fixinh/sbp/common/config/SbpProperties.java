@@ -106,8 +106,9 @@ public class SbpProperties {
 		 * <p>SMT's service serves bookings but publishes no staff API yet (API Documentation
 		 * §12.8 is still provisional). Tying staff to {@code mode} meant that the moment SBP
 		 * talked to the real SMP, creating a receptionist or technician failed outright — and
-		 * with it the welcome email of Req 3.1.S5. So staff stay on the mock by default until
-		 * SMT ships staff endpoints; then this becomes {@code live}.
+		 * with it the welcome email of Req 3.1.S5. So staff default to the mock; {@code live}
+		 * points at {@link #staffBaseUrl} — a standalone stand-in such as MockSMP, never SMT's
+		 * own service, which has nothing to answer at.
 		 */
 		private String staffMode = "mock";
 
@@ -121,6 +122,18 @@ public class SbpProperties {
 		 * {@code live}, unused when it is {@code mock}.
 		 */
 		private String serviceToken;
+
+		/**
+		 * Where a live {@link #staffMode} points, kept separate from {@link #baseUrl}. Staff and
+		 * bookings answer to different services — SMT's real one for bookings, a standalone
+		 * stand-in (MockSMP) for staff, since SMT publishes no staff API. Sharing {@link #baseUrl}
+		 * between them would send staff calls to SMT's service too, where every one 404s.
+		 */
+		private String staffBaseUrl;
+
+		/** The bearer token {@link #staffBaseUrl} checks. Separate from {@link #serviceToken} for
+		 * the same reason {@link #staffBaseUrl} is separate from {@link #baseUrl}. */
+		private String staffServiceToken;
 	}
 
 	/**

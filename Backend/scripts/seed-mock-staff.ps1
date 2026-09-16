@@ -145,8 +145,8 @@ foreach ($spec in $specs) {
         $failures++
         Write-SbpField 'POST /admin/staff' "$($response.Status) $(Get-SbpErrorCode $response)" 'Red'
         Write-Host "  $($response.Raw)" -ForegroundColor Red
-        if ($response.Status -eq 500) {
-            Write-Host '  If SMP_STAFF_MODE is live, the live staff client is still a placeholder; leave it on mock.' -ForegroundColor Red
+        if ($response.Status -eq 503) {
+            Write-Host '  If SMP_STAFF_MODE is live, check MockSMP is running and SMP_STAFF_SERVICE_TOKEN matches its own SMP_SERVICE_TOKEN.' -ForegroundColor Red
         }
         continue
     }

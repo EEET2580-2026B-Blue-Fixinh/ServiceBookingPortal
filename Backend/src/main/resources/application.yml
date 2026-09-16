@@ -90,9 +90,10 @@ fixinh:
       mode: ${SMP_MODE:mock}
       # Staff follow their own switch, not mode above. SMT's service serves bookings
       # but has no staff API yet (API Doc section 12.8 is still provisional), so staff
-      # stay on the mock even when bookings go live -- otherwise creating a receptionist
-      # or technician, and the welcome email that follows (Req 3.1.S5), fails outright
-      # the moment SBP talks to the real SMP. Set to live once SMT ships staff endpoints.
+      # default to the mock -- otherwise creating a receptionist or technician, and the
+      # welcome email that follows (Req 3.1.S5), fails outright the moment SBP talks to
+      # the real SMP. "live" here means staff-base-url below, a standalone stand-in such
+      # as MockSMP -- never base-url/SMT's own service, which has nothing to answer at.
       staff-mode: ${SMP_STAFF_MODE:mock}
       # Team SMT's service listens on 9443 and mounts everything under /api/v1
       # (their README, "API contract"). In "live" mode this is only partly live:
@@ -103,6 +104,11 @@ fixinh:
       # The bearer token SMT expects on every call. Their development default;
       # a real one belongs in the environment, never in this file.
       service-token: ${SMP_SERVICE_TOKEN:local-integration-token}
+      # Separate from base-url/service-token above: staff-mode=live must never point at
+      # SMT's real service (base-url), which has no staff API and would 404 every call.
+      # This is MockSMP's own address instead -- see MockSMP/README.md.
+      staff-base-url: ${SMP_STAFF_BASE_URL:http://localhost:8090}
+      staff-service-token: ${SMP_STAFF_SERVICE_TOKEN:dev-only-shared-secret}
       # The mirror image: the bearer SMP presents on every call to /integration (Req 4.M2,
       # API Doc §11.1), checked by IntegrationAuthenticationFilter with a constant-time
       # compare. Blank refuses every integration call rather than admitting them all. The

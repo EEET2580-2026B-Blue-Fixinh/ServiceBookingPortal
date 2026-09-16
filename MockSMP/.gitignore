@@ -1,0 +1,46 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Local test scratch ###
+sbp-test.ps1
+sbp-test-step10.ps1
+step10-check.ps1
+acceptance-notifications.ps1
+
+# Environment and credentials (never commit secrets!)
+.env
+*.env.local
+application-local.yml
+set-google-oauth.sh
+set-mongo-atlas.sh

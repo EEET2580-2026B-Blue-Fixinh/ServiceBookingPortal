@@ -1,9 +1,14 @@
 package com.fixinh.sbp.common.smp.config;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import com.fixinh.sbp.common.config.SbpProperties;
@@ -36,8 +41,8 @@ public class SmpClientConfig {
 
 	@Bean
 	@ConditionalOnProperty(prefix = "fixinh.sbp.smp", name = "staff-mode", havingValue = "live")
-	public SmpStaffClient liveSmpStaffClient() {
-		return new LiveSmpStaffClient();
+	public SmpStaffClient liveSmpStaffClient(SbpProperties properties) {
+		return new LiveSmpStaffClient(staffRestClient(properties.getSmp()));
 	}
 
 	@Bean
@@ -51,6 +56,9 @@ public class SmpClientConfig {
 	public SmpBookingClient liveSmpBookingClient(SbpProperties properties) {
 		return new LiveSmpBookingClient(smpRestClient(properties.getSmp()));
 	}
+
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+	private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 
 	/**
 	 * One client per SMP-facing bean rather than a shared one, so the bearer token is attached
@@ -71,6 +79,38 @@ public class SmpClientConfig {
 		return RestClient.builder()
 				.baseUrl(baseUrl)
 				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.requestFactory(timeoutRequestFactory())
 				.build();
+	}
+
+	/** Same shape as {@link #smpRestClient}, reading the staff-specific pair instead. */
+	private static RestClient staffRestClient(SbpProperties.Smp smp) {
+		String baseUrl = smp.getStaffBaseUrl();
+		if (baseUrl == null || baseUrl.isBlank()) {
+			throw new IllegalStateException(
+					"fixinh.sbp.smp.staff-base-url must be set when smp.staff-mode is live.");
+		}
+		String token = smp.getStaffServiceToken();
+		if (token == null || token.isBlank()) {
+			throw new IllegalStateException(
+					"fixinh.sbp.smp.staff-service-token must be set when smp.staff-mode is live.");
+		}
+		return RestClient.builder()
+				.baseUrl(baseUrl)
+				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.requestFactory(timeoutRequestFactory())
+				.build();
+	}
+
+	/**
+	 * Without this, an unreachable or hung stand-in blocks the calling request's thread
+	 * indefinitely instead of failing as {@code SMP_UNAVAILABLE} — the java.net.http default has
+	 * no timeout at all.
+	 */
+	private static ClientHttpRequestFactory timeoutRequestFactory() {
+		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+				HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+		factory.setReadTimeout(READ_TIMEOUT);
+		return factory;
 	}
 }

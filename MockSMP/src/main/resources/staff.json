@@ -1,0 +1,226 @@
+[
+	{
+		"staffId": "TEC-014",
+		"fullName": "John Tran",
+		"email": "john.tran@fixinh.vn",
+		"phoneNumber": "0987654321",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "12",
+			"streetName": "Nguyen Trai",
+			"ward": "Phường Bến Thành",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-021",
+		"fullName": "Le Thanh Tung",
+		"email": "tung.le@fixinh.vn",
+		"phoneNumber": "0918222555",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "45",
+			"streetName": "Tran Hung Dao",
+			"ward": "Phường Cầu Ông Lãnh",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-005",
+		"fullName": "Hoang Thi Lan",
+		"email": "lan.hoang@fixinh.vn",
+		"phoneNumber": "0918222666",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "8",
+			"streetName": "Le Loi",
+			"ward": "Phường Sài Gòn",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-032",
+		"fullName": "Bui Van Khoa",
+		"email": "khoa.bui@fixinh.vn",
+		"phoneNumber": "0918222777",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "INACTIVE",
+		"address": {
+			"streetNumber": "20",
+			"streetName": "Hai Ba Trung",
+			"ward": "Phường Tân Định",
+			"provinceCode": "HCM"
+		},
+		"branchProvinceCode": "HCM",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-018",
+		"fullName": "Pham Minh Duc",
+		"email": "duc.pham@fixinh.vn",
+		"phoneNumber": "0912345001",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "56",
+			"streetName": "Trang Tien",
+			"ward": "Phường Cửa Nam",
+			"provinceCode": "HN"
+		},
+		"branchProvinceCode": "HN",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-009",
+		"fullName": "Nguyen Thi Mai",
+		"email": "mai.nguyen@fixinh.vn",
+		"phoneNumber": "0912345002",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "23",
+			"streetName": "Hang Bac",
+			"ward": "Phường Hoàn Kiếm",
+			"provinceCode": "HN"
+		},
+		"branchProvinceCode": "HN",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-040",
+		"fullName": "Vo Thanh Long",
+		"email": "long.vo@fixinh.vn",
+		"phoneNumber": "0912345003",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "101",
+			"streetName": "Bach Dang",
+			"ward": "Phường Hải Châu",
+			"provinceCode": "DN"
+		},
+		"branchProvinceCode": "DN",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-011",
+		"fullName": "Tran Thi Kim Ngan",
+		"email": "ngan.tran@fixinh.vn",
+		"phoneNumber": "0912345004",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "7",
+			"streetName": "Nguyen Van Linh",
+			"ward": "Phường Thanh Khê",
+			"provinceCode": "DN"
+		},
+		"branchProvinceCode": "DN",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-045",
+		"fullName": "Dang Quoc Huy",
+		"email": "huy.dang@fixinh.vn",
+		"phoneNumber": "0912345005",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "INACTIVE",
+		"address": {
+			"streetNumber": "15",
+			"streetName": "Nguyen Van Cu",
+			"ward": "Phường Ninh Kiều",
+			"provinceCode": "CT"
+		},
+		"branchProvinceCode": "CT",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-015",
+		"fullName": "Ly Thi Thu Huong",
+		"email": "huong.ly@fixinh.vn",
+		"phoneNumber": "0912345006",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "33",
+			"streetName": "Mau Than",
+			"ward": "Phường Cái Khế",
+			"provinceCode": "CT"
+		},
+		"branchProvinceCode": "CT",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-050",
+		"fullName": "Nguyen Van Phuc",
+		"email": "phuc.nguyen@fixinh.vn",
+		"phoneNumber": "0912345007",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "88",
+			"streetName": "Le Loi",
+			"ward": "Phường Thuận Hóa",
+			"provinceCode": "HUE"
+		},
+		"branchProvinceCode": "HUE",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-052",
+		"fullName": "Truong Cong Danh",
+		"email": "danh.truong@fixinh.vn",
+		"phoneNumber": "0912345008",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "19",
+			"streetName": "Dien Bien Phu",
+			"ward": "Phường Ngô Quyền",
+			"provinceCode": "HP"
+		},
+		"branchProvinceCode": "HP",
+		"initialPassword": null
+	},
+	{
+		"staffId": "REC-020",
+		"fullName": "Do Thi Bich Ngoc",
+		"email": "ngoc.do@fixinh.vn",
+		"phoneNumber": "0912345009",
+		"staffRole": "RECEPTIONIST",
+		"employmentStatus": "INACTIVE",
+		"address": {
+			"streetNumber": "4",
+			"streetName": "Dien Bien Phu",
+			"ward": "Phường Lê Chân",
+			"provinceCode": "HP"
+		},
+		"branchProvinceCode": "HP",
+		"initialPassword": null
+	},
+	{
+		"staffId": "TEC-055",
+		"fullName": "Hoang Van Tai",
+		"email": "tai.hoang@fixinh.vn",
+		"phoneNumber": "0912345010",
+		"staffRole": "TECHNICIAN",
+		"employmentStatus": "ACTIVE",
+		"address": {
+			"streetNumber": "27",
+			"streetName": "Doi Can",
+			"ward": "Phường Ba Đình",
+			"provinceCode": "HN"
+		},
+		"branchProvinceCode": "HN",
+		"initialPassword": null
+	}
+]

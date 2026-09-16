@@ -24,12 +24,12 @@ Tailwind.
 | Reference data | ✅ | ✅ | `GET /reference/provinces` from an in-code catalogue |
 | My Bookings page | WIP | WIP | UI complete, still rendering `mockBookings.js` |
 | Customer profile | WIP | WIP | `GET`/`PUT /customers/me` not written |
-| Admin | ✅ | ✅ | Customers: list, activate and deactivate. Staff: list, search, create, update — relayed to SMP, which is mocked (`SMP_STAFF_MODE`) |
+| Admin | ✅ | ✅ | Customers: list, activate and deactivate. Staff: list, search, create, update — relayed to SMP; `SMP_STAFF_MODE` picks in-process mock or live against a standalone stand-in (`MockSMP`) |
 | Staff welcome email | ✅ | ✅ | Req 3.1.S5, §10.6: a letter on every staff creation, retried in the background. Written to `target/mail` on `dev`; sent for real with the `smtp` profile |
 | Ratings | WIP | WIP | Package scaffolding only |
 | Notifications / WebSocket | ✅ | ✅ | §9.1–9.3: list, mark read, real-time push over STOMP/SockJS at `/ws`. A `CONFIRMED` or `SCHEDULED` booking event raises one; opening the toast or the bell row goes to the booking |
 | SMP integration — inbound | ✅ | — | §11.7 `POST /integration/booking-events`: shared-secret auth, replay handling by `eventId`, projection refresh, then the notification |
-| SMP integration — outbound | WIP | — | Bookings reach SMP synchronously on creation; the outbox that makes that durable is not written. Staff: mock only — SMT publishes no staff API ([contract](docs/smp-staff-contract.md)) |
+| SMP integration — outbound | WIP | — | Bookings reach SMP synchronously on creation; the outbox that makes that durable is not written. Staff: live against `MockSMP`, a standalone stand-in — SMT itself publishes no staff API ([contract](docs/smp-staff-contract.md)) |
 | Cloudinary image relay | WIP | WIP | Config bound, service not implemented |
 | Google OAuth | WIP | WIP | Properties bound only |
 
@@ -86,6 +86,21 @@ pnpm dev
 
 Must stay on **port 3000** — it is the only origin the backend's CORS policy admits.
 
+### MockSMP (optional)
+
+Only needed to exercise the admin staff screens against a real HTTP call instead of the
+in-process mock — see [MockSMP/README.md](MockSMP/README.md).
+
+```powershell
+cd MockSMP
+.\mvnw.cmd spring-boot:run     # Windows
+./mvnw spring-boot:run         # macOS / Linux
+```
+
+Serves `http://localhost:8090`. Then point the backend at it: `SMP_STAFF_MODE=live`,
+`SMP_STAFF_BASE_URL=http://localhost:8090`, `SMP_STAFF_SERVICE_TOKEN` matching this service's
+own `MOCKSMP_SERVICE_TOKEN`.
+
 ---
 
 ## Configuration
@@ -102,7 +117,9 @@ no secret is committed.
 | `JWT_ACCESS_TOKEN_TTL_MINUTES` | `1` | Also what `/auth/login` reports as `expiresIn` |
 | `MONGO_URI_NORTH` / `MONGO_URI_SOUTH` | **none — required** | The two regional Atlas clusters. The only variables with no default: startup fails without them; the STOMP round-trip test skips itself and the context-load test fails |
 | `SMP_MODE` | `mock` | `mock` = local fixtures, `live` = real SMP |
-| `SMP_STAFF_MODE` | `mock` | Staff only, independent of `SMP_MODE`: SMT has no staff API yet, so staff stay mocked when bookings go live |
+| `SMP_BASE_URL` / `SMP_SERVICE_TOKEN` | `http://localhost:9443/api/v1` / dev placeholder | Where `SMP_MODE=live` points (Team SMT's service) and the bearer it sends |
+| `SMP_STAFF_MODE` | `mock` | Staff only, independent of `SMP_MODE`. `live` calls `SMP_STAFF_BASE_URL` — never SMT's service, which has no staff API — normally a standalone `MockSMP` instance |
+| `SMP_STAFF_BASE_URL` / `SMP_STAFF_SERVICE_TOKEN` | `http://localhost:8090` / dev placeholder | Where `SMP_STAFF_MODE=live` points and the bearer it sends. Separate from `SMP_BASE_URL`/`SMP_SERVICE_TOKEN` above on purpose — see [MockSMP/README.md](MockSMP/README.md) |
 | `SMP_WEBHOOK_SECRET` | dev placeholder | What SMP presents on `/integration/**`. Blank refuses every integration call rather than admitting them all |
 | `CORS_ALLOWED_ORIGINS` | localhost:3000 | No wildcards. The same list gates the `/ws` handshake |
 | `EMAIL_MODE` | `file` | Leave it alone: `dev` pins `file`, and the `smtp` profile sets `smtp` — see below |
@@ -135,10 +152,13 @@ one-off send should send only what you trigger. Mailtrap's sandbox works the sam
 (`sandbox.smtp.mailtrap.io`, port `2525`) and captures mail instead of delivering it. The app
 password lives in that terminal only; no credential belongs in a committed file.
 
-**Mock staff.** SMT's service covers booking creation and status changes only, so staff accounts
-come from SBP's mock SMP client — `SMP_STAFF_MODE=mock`, the default even when `SMP_MODE=live`.
-What a real or stand-in SMP staff API has to provide is in
-[docs/smp-staff-contract.md](docs/smp-staff-contract.md). Two scripts drive the welcome email
+**Staff.** SMT's service covers booking creation and status changes only, so staff accounts
+never come from it. By default SBP serves them from an in-process mock
+(`SMP_STAFF_MODE=mock`, independent of `SMP_MODE`); switching to `SMP_STAFF_MODE=live` points
+at `MockSMP` instead — a standalone service in this repo implementing the same contract over
+HTTP (see [MockSMP/README.md](MockSMP/README.md) to run it, and
+[docs/smp-staff-contract.md](docs/smp-staff-contract.md) for the contract itself, which any
+future SMT staff API would also have to meet). Two scripts drive the welcome email
 through the real endpoint; run them from `Backend` with the backend up:
 
 ```powershell
