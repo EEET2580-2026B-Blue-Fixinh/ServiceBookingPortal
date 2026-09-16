@@ -11,6 +11,7 @@ import {
 } from "../../components/booking/bookingPresentation";
 import { CancelBookingDialog } from "../../components/booking/CancelBookingDialog";
 import { MaterialIcon } from "../../components/shared/icons";
+import { Pagination } from "../../components/shared/Pagination";
 import { SelectField } from "../../components/shared/form/SelectField/SelectField";
 import { Toast } from "../../components/shared/Toast";
 import { ROUTES } from "../../config/constants";
@@ -46,6 +47,10 @@ const INITIAL_FILTERS = {
 
 // Long enough that a typed word is one request, short enough to feel immediate.
 const SEARCH_DEBOUNCE_MS = 350;
+
+// Sent as `size` on every request. The server slices the page before splitting it into
+// active and past, so this caps both sections together, not each one.
+const BOOKINGS_PAGE_SIZE = 5;
 
 const DATE_INPUT_CLASS =
   "rounded-[9px] border border-bk-border bg-white px-3 py-2.5 font-[inherit] text-bk-text " +
@@ -258,6 +263,7 @@ export function MyBookingsPage() {
       group,
       sort: SORT_OPTIONS.find((option) => option.label === filters.sort)?.value,
       page,
+      size: BOOKINGS_PAGE_SIZE,
     }),
     [
       debouncedSearch,
@@ -324,6 +330,14 @@ export function MyBookingsPage() {
   const totalElements = pageInfo?.totalElements ?? 0;
   const totalPages = pageInfo?.totalPages ?? 0;
   const hasResults = active.length > 0 || past.length > 0;
+
+  // Cancelling the last booking on the final page of the Active tab moves it out of this
+  // result set, leaving the page empty. Step back to the new last page instead of showing
+  // "No bookings match your filters" while matches still exist. Adjusted during render
+  // rather than in an effect, so the empty page never paints.
+  if (status === "ready" && page > 0 && page >= totalPages) {
+    setPage(Math.max(totalPages - 1, 0));
+  }
 
   return (
     <BookingShell
@@ -529,29 +543,14 @@ export function MyBookingsPage() {
                 onOpen={openBooking}
               />
 
-              {totalPages > 1 && (
-                <nav className="flex items-center justify-center gap-4 pt-2">
-                  <button
-                    type="button"
-                    disabled={page === 0}
-                    onClick={() => setPage((current) => current - 1)}
-                    className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal disabled:cursor-not-allowed disabled:text-bk-muted disabled:opacity-60 enabled:hover:border-bk-teal enabled:hover:bg-bk-teal-soft"
-                  >
-                    Previous
-                  </button>
-                  <span className="font-mono text-[12.5px] text-bk-muted">
-                    Page {page + 1} of {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={page + 1 >= totalPages}
-                    onClick={() => setPage((current) => current + 1)}
-                    className="appearance-none rounded-[9px] border border-bk-border bg-bk-surface px-4 py-2 font-bold text-bk-teal disabled:cursor-not-allowed disabled:text-bk-muted disabled:opacity-60 enabled:hover:border-bk-teal enabled:hover:bg-bk-teal-soft"
-                  >
-                    Next
-                  </button>
-                </nav>
-              )}
+              {/* The shared control counts pages from 1; the API counts from 0. */}
+              <Pagination
+                page={page + 1}
+                pageSize={BOOKINGS_PAGE_SIZE}
+                totalItems={totalElements}
+                itemNoun="bookings"
+                onPageChange={(nextPage) => setPage(nextPage - 1)}
+              />
             </>
           ) : (
             status === "ready" && (
