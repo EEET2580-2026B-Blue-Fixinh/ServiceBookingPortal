@@ -91,8 +91,22 @@ public class CloudinaryImageStorageService implements ImageStorageService {
 			if (ex instanceof ImageUploadException alreadyWrapped) {
 				throw alreadyWrapped;
 			}
+			log.error("Cloudinary upload failed for {}/{} (image {} of {}): {}",
+					folder, publicId, position, total, rootCauseSummary(ex));
 			throw new ImageUploadException(
 					"Cloudinary refused image %d of %d.".formatted(position, total), ex);
 		}
+	}
+
+	private static String rootCauseSummary(Throwable failure) {
+		Throwable rootCause = failure;
+		while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+			rootCause = rootCause.getCause();
+		}
+
+		String message = rootCause.getMessage();
+		return message == null || message.isBlank()
+				? rootCause.getClass().getSimpleName()
+				: rootCause.getClass().getSimpleName() + ": " + message;
 	}
 }

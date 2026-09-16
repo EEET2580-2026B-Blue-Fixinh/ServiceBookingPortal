@@ -8,7 +8,9 @@ RUN ./mvnw -B -DskipTests package
 
 FROM eclipse-temurin:17-jre-jammy
 RUN groupadd --system spring \
-    && useradd --system --gid spring --home-dir /app spring
+    && useradd --system --gid spring --home-dir /app spring \
+    && mkdir -p /app/data/uploads /app/data/mail \
+    && chown -R spring:spring /app/data
 WORKDIR /app
 COPY --from=build --chown=spring:spring /workspace/target/sbp-*.jar app.jar
 USER spring

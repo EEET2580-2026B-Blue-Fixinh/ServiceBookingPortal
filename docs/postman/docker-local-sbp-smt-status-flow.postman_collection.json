@@ -1,0 +1,434 @@
+{
+  "info": {
+    "name": "Fixinh · Docker local SBP ↔ SMT booking status flow",
+    "description": "Interactive status flow for the local Docker stack. Start the stack with `docker compose up --build -d`, create a NEW booking in http://localhost:3000, copy its ORD-YYYY-NNNN reference into the `bookingRef` collection variable, then send these requests from top to bottom. SMT owns CONFIRMED, SCHEDULED and COMPLETED. Because SMT currently exposes no callback and SBP does not poll automatically, each SMT mutation is followed by an explicit SMT → SBP projection event. WORKING is marked as a demo-only SBP event because the current SMT API has no start-work endpoint. Do not reuse a completed booking: SMT enforces forward-only status transitions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "sbpBaseUrl", "value": "http://localhost:8443/api/v1" },
+    { "key": "smtBaseUrl", "value": "http://localhost:9443/api/v1" },
+    { "key": "customerEmail", "value": "docker-smoke-20260916@example.com" },
+    { "key": "customerPassword", "value": "LocalTest1!" },
+    { "key": "smtToken", "value": "local-integration-token" },
+    { "key": "smpSecret", "value": "local-webhook-secret" },
+    { "key": "token", "value": "" },
+    { "key": "customerId", "value": "" },
+    { "key": "bookingRef", "value": "" },
+    { "key": "estimatedServiceFee", "value": "500000" },
+    { "key": "estimatedDurationMinutes", "value": "120" },
+    { "key": "smtScheduledAt", "value": "" },
+    { "key": "sbpScheduledStartAt", "value": "" },
+    {
+      "key": "technicianIds",
+      "value": "[\"TECH-002\"]"
+    },
+    {
+      "key": "technicians",
+      "value": "[{\"technicianId\":\"TECH-002\",\"fullName\":\"Tran Quoc Bao\"}]"
+    },
+    { "key": "completedServiceFee", "value": "500000" },
+    { "key": "materialCost", "value": "150000" },
+    { "key": "totalCost", "value": "650000" }
+  ],
+  "item": [
+    {
+      "name": "0 · [SBP] Login customer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.unset('token');",
+              "pm.collectionVariables.unset('customerId');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('CUSTOMER token issued', () => {",
+              "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+              "  pm.expect(body.user.role).to.eql('CUSTOMER');",
+              "});",
+              "pm.collectionVariables.set('token', body.accessToken);",
+              "pm.collectionVariables.set('customerId', body.user.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}"
+        },
+        "url": "{{sbpBaseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "1 · [SBP] Verify new booking and prepare schedule",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('booking is CREATED', () => pm.expect(body.status).to.eql('CREATED'));",
+              "const startTime = body.availableStartTime.length === 5 ? `${body.availableStartTime}:00` : body.availableStartTime;",
+              "const localDateTime = `${body.preferredServiceDate}T${startTime}`;",
+              "const instant = new Date(`${localDateTime}+07:00`).toISOString();",
+              "pm.collectionVariables.set('smtScheduledAt', localDateTime);",
+              "pm.collectionVariables.set('sbpScheduledStartAt', instant);",
+              "console.log('SMT schedule:', localDateTime, 'SBP instant:', instant);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{sbpBaseUrl}}/bookings/{{bookingRef}}"
+      }
+    },
+    {
+      "name": "2 · [SMT] Verify the same booking arrived from SBP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('same booking is CREATED in SMT', () => {",
+              "  pm.expect(body.bookingRef).to.eql(pm.variables.get('bookingRef'));",
+              "  pm.expect(body.customerId).to.eql(pm.variables.get('customerId'));",
+              "  pm.expect(body.status).to.eql('CREATED');",
+              "  pm.expect(body.originChannel).to.eql('SBP');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smtToken}}", "type": "string" }]
+        },
+        "method": "GET",
+        "url": "{{smtBaseUrl}}/bookings/{{bookingRef}}"
+      }
+    },
+    {
+      "name": "3 · [SMT] Receptionist confirms booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('SMT status is CONFIRMED', () => pm.expect(pm.response.json().status).to.eql('CONFIRMED'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smtToken}}", "type": "string" }]
+        },
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estimatedServiceFee\": {{estimatedServiceFee}},\n  \"estimatedDurationMinutes\": {{estimatedDurationMinutes}}\n}"
+        },
+        "url": "{{smtBaseUrl}}/bookings/{{bookingRef}}/confirmation"
+      }
+    },
+    {
+      "name": "4 · [SMT → SBP] Sync CONFIRMED",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "pm.test('event accepted once', () => pm.expect(pm.response.json()).to.include({accepted: true, duplicate: false}));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smpSecret}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-{{$guid}}\",\n  \"eventType\": \"BOOKING_STATUS_CHANGED\",\n  \"occurredAt\": \"{{$isoTimestamp}}\",\n  \"bookingRef\": \"{{bookingRef}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"payload\": {\n    \"status\": \"CONFIRMED\",\n    \"estimatedDurationMinutes\": {{estimatedDurationMinutes}}\n  }\n}"
+        },
+        "url": "{{sbpBaseUrl}}/integration/booking-events"
+      }
+    },
+    {
+      "name": "5 · [SMT] Schedule with technician",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('SMT status is SCHEDULED', () => pm.expect(body.status).to.eql('SCHEDULED'));",
+              "pm.test('TECH-002 assigned', () => pm.expect(body.technicians.map(t => t.technicianId)).to.include('TECH-002'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smtToken}}", "type": "string" }]
+        },
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"scheduledAt\": \"{{smtScheduledAt}}\",\n  \"technicianIds\": {{technicianIds}}\n}"
+        },
+        "url": "{{smtBaseUrl}}/bookings/{{bookingRef}}/schedule"
+      }
+    },
+    {
+      "name": "6 · [SMT → SBP] Sync SCHEDULED",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "pm.test('event accepted once', () => pm.expect(pm.response.json()).to.include({accepted: true, duplicate: false}));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smpSecret}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-{{$guid}}\",\n  \"eventType\": \"TECHNICIAN_ASSIGNED\",\n  \"occurredAt\": \"{{$isoTimestamp}}\",\n  \"bookingRef\": \"{{bookingRef}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"payload\": {\n    \"status\": \"SCHEDULED\",\n    \"scheduledStartAt\": \"{{sbpScheduledStartAt}}\",\n    \"estimatedDurationMinutes\": {{estimatedDurationMinutes}},\n    \"technicians\": {{technicians}}\n  }\n}"
+        },
+        "url": "{{sbpBaseUrl}}/integration/booking-events"
+      }
+    },
+    {
+      "name": "7 · [SBP] Check SCHEDULED projection",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('SBP status is SCHEDULED', () => pm.expect(body.status).to.eql('SCHEDULED'));",
+              "pm.test('technician is visible', () => pm.expect(body.technicians.map(t => t.technicianId)).to.include('TECH-002'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{sbpBaseUrl}}/bookings/{{bookingRef}}"
+      }
+    },
+    {
+      "name": "8 · [Demo event → SBP] Mark WORKING (SMT has no endpoint)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smpSecret}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-{{$guid}}\",\n  \"eventType\": \"BOOKING_STATUS_CHANGED\",\n  \"occurredAt\": \"{{$isoTimestamp}}\",\n  \"bookingRef\": \"{{bookingRef}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"payload\": {\n    \"status\": \"WORKING\"\n  }\n}"
+        },
+        "url": "{{sbpBaseUrl}}/integration/booking-events"
+      }
+    },
+    {
+      "name": "9 · [SMT] Complete with final costs",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('SMT status is COMPLETED', () => pm.expect(body.status).to.eql('COMPLETED'));",
+              "pm.test('SMT total is correct', () => pm.expect(body.totalCost).to.eql(Number(pm.variables.get('totalCost'))));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smtToken}}", "type": "string" }]
+        },
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"completedServiceFee\": {{completedServiceFee}},\n  \"materialCost\": {{materialCost}}\n}"
+        },
+        "url": "{{smtBaseUrl}}/bookings/{{bookingRef}}/completion"
+      }
+    },
+    {
+      "name": "10 · [SMT → SBP] Sync COMPLETED and bill",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "pm.test('event accepted once', () => pm.expect(pm.response.json()).to.include({accepted: true, duplicate: false}));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smpSecret}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-{{$guid}}\",\n  \"eventType\": \"BILL_ISSUED\",\n  \"occurredAt\": \"{{$isoTimestamp}}\",\n  \"bookingRef\": \"{{bookingRef}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"payload\": {\n    \"status\": \"COMPLETED\",\n    \"serviceFee\": {{completedServiceFee}},\n    \"materialCost\": {{materialCost}},\n    \"totalCost\": {{totalCost}},\n    \"billIssuedAt\": \"{{$isoTimestamp}}\"\n  }\n}"
+        },
+        "url": "{{sbpBaseUrl}}/integration/booking-events"
+      }
+    },
+    {
+      "name": "11 · [SMT] Check final authoritative booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('SMT is COMPLETED', () => pm.expect(body.status).to.eql('COMPLETED'));",
+              "pm.test('SMT total matches', () => pm.expect(body.totalCost).to.eql(Number(pm.variables.get('totalCost'))));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{smtToken}}", "type": "string" }]
+        },
+        "method": "GET",
+        "url": "{{smtBaseUrl}}/bookings/{{bookingRef}}"
+      }
+    },
+    {
+      "name": "12 · [SBP] Check final projection and bill",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.test('SBP is COMPLETED', () => pm.expect(body.status).to.eql('COMPLETED'));",
+              "pm.test('SBP recomputed the same total', () => {",
+              "  pm.expect(body.bill.totalCost).to.eql(body.bill.serviceFee + body.bill.materialCost);",
+              "  pm.expect(body.bill.totalCost).to.eql(Number(pm.variables.get('totalCost')));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{sbpBaseUrl}}/bookings/{{bookingRef}}"
+      }
+    },
+    {
+      "name": "13 · [SBP] Check CONFIRMED and SCHEDULED notifications",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const ref = pm.variables.get('bookingRef');",
+              "const types = pm.response.json().items.filter(n => n.bookingRef === ref).map(n => n.type);",
+              "pm.test('customer received both notifications', () => {",
+              "  pm.expect(types).to.include('BOOKING_CONFIRMED');",
+              "  pm.expect(types).to.include('BOOKING_SCHEDULED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{sbpBaseUrl}}/notifications?size=50"
+      }
+    }
+  ]
+}
