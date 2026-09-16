@@ -1,9 +1,14 @@
 package com.fixinh.sbp.common.smp.config;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import com.fixinh.sbp.common.config.SbpProperties;
@@ -52,6 +57,9 @@ public class SmpClientConfig {
 		return new LiveSmpBookingClient(smpRestClient(properties.getSmp()));
 	}
 
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+	private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+
 	/**
 	 * One client per SMP-facing bean rather than a shared one, so the bearer token is attached
 	 * by construction and no call site can forget it. SMT checks the token on every path except
@@ -71,6 +79,7 @@ public class SmpClientConfig {
 		return RestClient.builder()
 				.baseUrl(baseUrl)
 				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.requestFactory(timeoutRequestFactory())
 				.build();
 	}
 
@@ -89,6 +98,19 @@ public class SmpClientConfig {
 		return RestClient.builder()
 				.baseUrl(baseUrl)
 				.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.requestFactory(timeoutRequestFactory())
 				.build();
+	}
+
+	/**
+	 * Without this, an unreachable or hung stand-in blocks the calling request's thread
+	 * indefinitely instead of failing as {@code SMP_UNAVAILABLE} — the java.net.http default has
+	 * no timeout at all.
+	 */
+	private static ClientHttpRequestFactory timeoutRequestFactory() {
+		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+				HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+		factory.setReadTimeout(READ_TIMEOUT);
+		return factory;
 	}
 }
